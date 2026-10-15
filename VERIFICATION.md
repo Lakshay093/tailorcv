@@ -12,23 +12,26 @@ Date: October 15, 2026 (Asia/Kolkata).
 | Desktop/mobile browser workflow | All 4 tests passed; actual HTTP parsing, tailoring, and exports with only Gemini mocked. Screenshots inspected at both widths. |
 | Sample PDF visual inspection | Passed: one selectable-text page with clear headings, wrapped text, and no clipping. |
 | Real Gemini smoke | Passed with `gemini-3.6-flash`: structuring, JD analysis, tailoring, factual validation, PDF and DOCX exports. |
-| Docker image execution | Not run: Docker CLI exists but the Docker Desktop engine is stopped/unavailable. |
+| Docker image execution | Render built the Docker image, started the container, and passed `/health`. Local Docker Desktop execution was unavailable because its engine was stopped. |
 | Public frontend | Deployed to Vercel; unauthenticated HTTPS GET returned 200 and contained the TailorCV workspace. |
-| Public complete workflow | Backend deployment and API connection in progress. Gemini and Render credentials verified locally. |
-| GitHub Actions | First two Linux runs passed backend, lint/typecheck/build, and desktop/mobile browser jobs. |
+| Public complete workflow | Passed one live Playwright test against the deployed Vercel frontend and Render API with real Gemini. Verified upload, JD, customization, protected fields, unselected projects, editing, PDF/DOCX/TXT downloads, desktop/mobile layouts, and no browser exceptions. |
+| Public downloaded documents | Extracted the actual downloaded PDF and DOCX: both contained the latest edited Unicode summary and excluded missing-keyword analysis. The selectable-text PDF rendered cleanly on one page. |
+| GitHub Actions | Linux backend, lint/typecheck/build, and mocked desktop/mobile browser jobs passed on commit `680a389`. |
 
 ## Repository and live URLs
 
 - Repository: [Lakshay093/tailorcv](https://github.com/Lakshay093/tailorcv), source pushed on `codex/tailorcv`.
-- Frontend: [tailorcv-orcin.vercel.app](https://tailorcv-orcin.vercel.app). The UI is public; API-backed features await the backend connection.
-- Backend: not yet deployed.
+- Frontend: [tailorcv-orcin.vercel.app](https://tailorcv-orcin.vercel.app).
+- Backend: [tailorcv-api-amdh.onrender.com](https://tailorcv-api-amdh.onrender.com/health).
+- API documentation: [interactive OpenAPI docs](https://tailorcv-api-amdh.onrender.com/docs).
 
-## Remaining external setup
+## Deployment state and maintenance
 
-1. Sign in to Render or connect the Render integration. The browser currently shows Render's sign-in page; no Render API key or CLI session is available.
-2. Import root `render.yaml` from the repository (default branch `codex/tailorcv`). Set `GEMINI_API_KEY` and `ALLOWED_ORIGINS=https://tailorcv-orcin.vercel.app`; the Blueprint generates `RESUME_SIGNING_KEY` and sets production mode. Confirm the chosen compute plan and account eligibility.
-3. Set Vercel `NEXT_PUBLIC_API_BASE_URL` to the actual Render HTTPS URL and redeploy the frontend. The current deployment intentionally has no invented API URL and shows a service-unavailable notice.
-4. Run the real-provider smoke script and the public upload/customize/edit/download workflow. Record the actual model result and backend URL here.
+No external setup remains for the submitted public workflow. Render runs the Docker backend on a Free instance in Singapore with production mode, a generated signing secret, `gemini-3.6-flash`, and the exact Vercel origin in CORS. Vercel has `NEXT_PUBLIC_API_BASE_URL=https://tailorcv-api-amdh.onrender.com` for production, preview, and development. Preview domains require their own explicit CORS entry before use.
+
+Render's Free instance can sleep after 15 idle minutes, causing a cold start. Select suitable paid compute separately for production service guarantees. Rate limiting remains per process, not a distributed account quota. Parsing, font coverage, standardized formatting, and heuristic-score limitations are documented in the README.
+
+The real provider initially exposed an SDK OpenAPI-schema serialization mismatch and excessive nested schema bounds. Both were corrected, covered by real-SDK transport tests, and reverified against Google. `gemini-3.8-flash` returned high-demand errors; the configured and verified model is `gemini-3.6-flash`.
 
 Vercel project `tailorcv` is configured with root `frontend`, Next.js, Node 24.x, `npm ci`, and `npm run build`. Publication used authenticated CLI upload. Automatic Git deployments are not connected: Vercel requires adding a GitHub Login Connection to that account. This is independent of the working GitHub connector and local git credentials.
 
@@ -40,4 +43,4 @@ Starlette 1.8 emits a deprecation warning for its httpx-backed TestClient; the t
 
 ESLint 9.39.5 is the latest compatible major for the peer ranges of Next.js's React/import/accessibility lint plugins. npm marks ESLint 9 unsupported; moving to ESLint 10 currently produces peer-range warnings. This maintenance limitation is confined to development tooling. Runtime dependencies are unaffected.
 
-The submission remains incomplete until real Gemini processing and the public Vercel/Render workflow are verified. No successful external checks or URLs are implied by passing mocked tests.
+The repository and complete public application are available, and real-provider verification is separate from the 47 backend checks and four mocked browser checks. To rerun the public test, set `LIVE_APP_URL=https://tailorcv-orcin.vercel.app` and run `npm run test:live` from `frontend/`. It makes actual Gemini calls using only synthetic sample data.

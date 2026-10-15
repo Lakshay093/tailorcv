@@ -7,7 +7,7 @@ services:
     healthCheckPath: /health
     # Assessment/demo tier. Sleeps after 15 idle minutes; use paid compute for production.
     plan: free
-    autoDeployTrigger: commit
+    autoDeployTrigger: checksPass
     envVars:
       - key: GEMINI_API_KEY
         sync: false

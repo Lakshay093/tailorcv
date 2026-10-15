@@ -4,7 +4,7 @@ A working resume customization app: add a job description, upload a PDF or DOCX,
 
 ## Submission status
 
-Source is published at [Lakshay093/tailorcv](https://github.com/Lakshay093/tailorcv). The [Vercel frontend](https://tailorcv-orcin.vercel.app) is public, with its backend connection pending. Full verification results and exact external setup steps are recorded in [VERIFICATION.md](VERIFICATION.md). A real Gemini smoke test requires a valid backend API key. Mocked tests are explicitly distinguished from live provider verification. The assessment is **not submission-ready until the Render backend and complete public workflow, including real Gemini processing, are verified**.
+Source is published at [Lakshay093/tailorcv](https://github.com/Lakshay093/tailorcv). The [public app](https://tailorcv-orcin.vercel.app) connects to the [Render API](https://tailorcv-api-amdh.onrender.com/health). The deployed workflow has passed a real Gemini browser test covering upload, tailoring, protected fields, editing, all three downloads, and desktop/mobile layouts. Full results and hosting limitations are recorded in [VERIFICATION.md](VERIFICATION.md). Mocked automated tests and live-provider checks are reported separately.
 
 ## Stack
 
@@ -172,11 +172,14 @@ npm run typecheck
 npm run build
 npx playwright install chromium
 npm run test:e2e
+
+# Separate, opt-in test of the real deployed frontend/backend and Gemini:
+LIVE_APP_URL=https://tailorcv-orcin.vercel.app npm run test:live
 ```
 
 Playwright launches the real frontend and FastAPI server on ports 3000 and 8001. Only Gemini is replaced by a test dependency override in `tests.mock_server`; the production application has no mock-mode setting. The browser workflow covers upload, JD entry, extraction preview, selection, customization, changes/suggestions, editing, three downloads, errors, and preserved inputs. It runs on desktop and mobile viewports, checks for browser exceptions and horizontal overflow, and captures screenshots. Backend tests validate exported file content after edits. CI repeats backend, frontend, and browser checks on Linux.
 
-The browser suite must own its test ports; stop a local frontend on port 3000 before running it. Linux CI uses `npx playwright install --with-deps chromium`. The Windows test config selects `.venv/Scripts/python.exe`; Linux uses `.venv/bin/python`. Override with `E2E_PYTHON` if necessary.
+The browser suite must own its test ports; stop a local frontend on port 3000 before running it. Linux CI uses `npx playwright install --with-deps chromium`. The Windows test config selects `.venv/Scripts/python.exe`; Linux uses `.venv/bin/python`. Override with `E2E_PYTHON` if necessary. The public test uses live Gemini calls and is deliberately excluded from normal CI. On PowerShell run `$env:LIVE_APP_URL='https://tailorcv-orcin.vercel.app'` followed by `npm run test:live`. It uploads only the synthetic sample, verifies protected fields and unselected projects, edits the result, downloads all three formats, and inspects both viewport sizes without duplicating generation for mobile.
 
 See [VERIFICATION.md](VERIFICATION.md) for checks actually run and remaining limitations.
 
