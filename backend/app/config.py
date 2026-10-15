@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-3.8-flash"
+    gemini_model: str = "gemini-3.6-flash"
     allowed_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     max_upload_mb: int = Field(default=5, ge=1, le=20)
     jd_min_chars: int = Field(default=100, ge=1)

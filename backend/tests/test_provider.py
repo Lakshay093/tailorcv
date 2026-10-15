@@ -4,12 +4,14 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from google.genai import errors
+import httpx
+from google import genai
+from google.genai import errors, types
 
 from app.config import Settings
 from app.errors import AppError
-from app.llm import GeminiProvider
-from app.schemas import JobAnalysis
+from app.llm import GeminiProvider, provider_json_schema
+from app.schemas import JobAnalysis, StructuredResume, TailoringOutput
 
 
 def test_provider_settings_do_not_expose_secret(client):
@@ -91,3 +93,47 @@ async def test_blocked_provider_response(monkeypatch):
     with pytest.raises(AppError) as exc:
         await GeminiProvider(Settings(gemini_api_key="test")).generate(JobAnalysis, "system", {})
     assert exc.value.code == "PROVIDER_BLOCKED"
+
+
+@pytest.mark.parametrize("schema", [StructuredResume, JobAnalysis, TailoringOutput])
+async def test_sdk_sends_json_schema_without_openapi_conversion(schema):
+    """Exercise the real SDK serializer; only its HTTP transport is replaced."""
+    requests = []
+
+    def respond(request):
+        body = json.loads(request.content)
+        requests.append(body)
+        config = body["generationConfig"]
+        assert "responseSchema" not in config
+        assert config["responseMimeType"] == "application/json"
+        assert config["responseJsonSchema"] == provider_json_schema(schema)
+        assert config["responseJsonSchema"]["additionalProperties"] is False
+        return httpx.Response(200, json={"candidates": [{"content": {"role": "model", "parts": [{"text": "{}"}]}, "finishReason": "STOP"}]})
+
+    client = genai.Client(api_key="synthetic-test-key", http_options=types.HttpOptions(
+        async_client_args={"transport": httpx.MockTransport(respond)},
+        retry_options=types.HttpRetryOptions(attempts=1),
+    ))
+    try:
+        async with client.aio as session:
+            response = await GeminiProvider(Settings(gemini_api_key="synthetic-test-key", provider_retries=0))._call(session, schema, "Test system prompt", "{}")
+            assert response.text == "{}"
+    finally:
+        client.close()
+    assert len(requests) == 1
+
+
+def test_generation_schema_compacts_bounds_without_weakening_local_validation():
+    from pydantic import ValidationError
+    from app.schemas import Resume
+    from tests.fixtures import sample_resume
+
+    wire = provider_json_schema(StructuredResume)
+    assert "maxItems" not in wire["$defs"]["Resume"]["properties"]["skills"]
+    assert "maxLength" not in wire["$defs"]["Contact"]["properties"]["name"]
+    assert "title" in wire["$defs"]["Experience"]["properties"]
+    assert wire["$defs"]["Resume"]["additionalProperties"] is False
+    data = sample_resume().model_dump()
+    data["skills"] = ["Python"] * 201
+    with pytest.raises(ValidationError):
+        Resume.model_validate(data)

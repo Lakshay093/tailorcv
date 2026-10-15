@@ -13,6 +13,32 @@ from app.errors import AppError
 T = TypeVar("T", bound=BaseModel)
 
 
+def provider_json_schema(model: type[BaseModel]) -> dict:
+    """Keep the generation grammar small; Pydantic enforces all bounds locally.
+
+    Large nested string/array bounds can exceed Gemini's schema-state budget.
+    Defaults aren't part of its supported JSON Schema subset either.
+    """
+    omitted = {"minLength", "maxLength", "minItems", "maxItems", "default"}
+
+    def compact(node):
+        if isinstance(node, list):
+            return [compact(item) for item in node]
+        if not isinstance(node, dict):
+            return node
+        result = {}
+        for key, value in node.items():
+            if key in omitted:
+                continue
+            if key in {"properties", "$defs"}:
+                result[key] = {name: compact(child) for name, child in value.items()}
+            else:
+                result[key] = compact(value)
+        return result
+
+    return compact(model.model_json_schema())
+
+
 class GeminiProvider:
     def __init__(self, settings: Settings):
         self.settings = settings
@@ -56,7 +82,10 @@ class GeminiProvider:
                 return await asyncio.wait_for(session.models.generate_content(
                     model=self.settings.gemini_model,
                     contents=prompt,
-                    config=types.GenerateContentConfig(system_instruction=system, response_mime_type="application/json", response_schema=schema, temperature=0.2, max_output_tokens=20000),
+                    # Use the JSON Schema wire field. response_schema converts the
+                    # Pydantic model to an OpenAPI subset and serializes nested
+                    # additionalProperties incorrectly with this SDK version.
+                    config=types.GenerateContentConfig(system_instruction=system, response_mime_type="application/json", response_json_schema=provider_json_schema(schema), temperature=0.2, max_output_tokens=20000),
                 ), timeout=self.settings.provider_timeout_seconds)
             except errors.APIError as exc:
                 status = int(exc.code or 500)

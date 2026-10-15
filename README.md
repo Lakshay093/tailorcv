@@ -10,7 +10,7 @@ Source is published at [Lakshay093/tailorcv](https://github.com/Lakshay093/tailo
 
 - Frontend: Next.js 16.4.1 App Router, React 19.3.1, TypeScript 6.0.3, Tailwind CSS 4.3.3, shadcn-style source-owned Button/Tabs components using Radix and CVA, Lucide icons.
 - Backend: Python 3.12, FastAPI 0.143.1, Pydantic 2.14.1.
-- AI: Google's official `google-genai==2.31.0` Python SDK. The configured default model is **`gemini-3.8-flash`**. No live model execution is claimed without a successful smoke test.
+- AI: Google's official `google-genai==2.31.0` Python SDK. The configured and live-tested model is **`gemini-3.6-flash`**. Resume structuring, JD analysis, tailoring, factual checks, and both document exports passed a real-provider smoke test. The initially chosen `gemini-3.8-flash` returned high-demand errors during verification.
 - Parsing: pdfplumber 0.11.10 and python-docx 1.2.0. Exports: ReportLab 5.0.1 and python-docx.
 - Tests: pytest and Playwright Chromium, desktop and mobile.
 
@@ -48,7 +48,7 @@ Without a key, upload still extracts real text and displays a clear setup warnin
 | Variable | Default / purpose |
 | --- | --- |
 | `GEMINI_API_KEY` | Required for AI calls, backend only. Never prefix with `NEXT_PUBLIC_`. |
-| `GEMINI_MODEL` | `gemini-3.8-flash`; change only to a model supporting JSON schema output. |
+| `GEMINI_MODEL` | `gemini-3.6-flash`; change only to a model supporting JSON schema output. |
 | `ALLOWED_ORIGINS` | Explicit comma-separated frontend origins. Local: `http://localhost:3000,http://127.0.0.1:3000`. Production: exact HTTPS frontend domain(s), no wildcard. |
 | `MAX_UPLOAD_MB` | 5; maximum raw upload size in MiB. |
 | `JD_MIN_CHARS` | 100 non-whitespace characters. |
@@ -137,7 +137,7 @@ The server rejects modified contact information, employers/titles/dates, educati
 
 These checks cannot prove semantic equivalence of every sentence or detect every invented nonnumeric claim. All generated output is explicitly marked for user review. Missing source terms appear as suggestions requiring confirmation, never as resume bullets. User edits are intentional and can change any displayed field; exports use the edited data. Generated comparisons and scores are not recomputed after manual edits, and the UI labels that limitation.
 
-Provider calls use the official SDK's async API with typed `response_schema`, `response_mime_type="application/json"`, explicit timeouts, SDK retries disabled, and at most two application retries for quota/transient server/timeout failures. One schema repair regenerates from original inputs, then malformed output returns an error. Each schema operation can therefore make at most six provider calls in the worst case (two generations, three transport attempts each); customize has two operations. Semantic/factual validation failures are rejected, not automatically repaired or presented as verified.
+Provider calls use the official SDK's async API with `response_json_schema` derived from the Pydantic model, `response_mime_type="application/json"`, explicit timeouts, SDK retries disabled, and at most two application retries for quota/transient server/timeout failures. Generation schemas retain their structure and `additionalProperties` rules while omitting string/array bounds and defaults to avoid Gemini's schema-state limit. Pydantic enforces every original bound on the returned JSON. The JSON Schema wire field also avoids the SDK's incompatible OpenAPI conversion. Transport tests exercise the actual SDK serializer for all three response schemas. One schema repair regenerates from original inputs, then malformed output returns an error. Each schema operation can therefore make at most six provider calls in the worst case (two generations, three transport attempts each); customize has two operations. Semantic/factual validation failures are rejected, not automatically repaired or presented as verified.
 
 ## Keyword match estimate
 
@@ -186,7 +186,7 @@ Hosting documentation was checked against official sources during implementation
 
 1. Push this repository to GitHub. Keep `.env`, `.venv`, `node_modules`, and test artifacts out of Git.
 2. In Render, create a Blueprint from root `render.yaml`, or create a Docker web service manually. **Root:** `backend`; **Dockerfile:** `./Dockerfile`; **health check:** `/health`. Docker builds run `uv sync --frozen --no-dev --no-install-project`. Start is `uvicorn app.main:app --host 0.0.0.0 --port $PORT --no-access-log`. The image runs as a non-root user.
-3. Set backend secrets `GEMINI_API_KEY`, shared random `RESUME_SIGNING_KEY`, `ENVIRONMENT=production`, `GEMINI_MODEL=gemini-3.8-flash`, and `ALLOWED_ORIGINS` to the exact intended Vercel production HTTPS URL. The Blueprint generates a signing key and prompts for the API key and origins. Never put these secrets in Vercel's public variables. Save the actual Render HTTPS URL.
+3. Set backend secrets `GEMINI_API_KEY`, shared random `RESUME_SIGNING_KEY`, `ENVIRONMENT=production`, `GEMINI_MODEL=gemini-3.6-flash`, and `ALLOWED_ORIGINS` to the exact intended Vercel production HTTPS URL. The Blueprint generates a signing key and prompts for the API key and origins. Never put these secrets in Vercel's public variables. Save the actual Render HTTPS URL.
 4. In Vercel, import the GitHub repository. **Root Directory:** `frontend`; **framework:** Next.js; **Node:** 24.x; **install:** `npm ci`; **build:** `npm run build`; **output:** framework default. Set `NEXT_PUBLIC_API_BASE_URL` to the Render HTTPS URL for the intended deployment environments. Root-local `frontend/vercel.json` supplies build settings.
 5. Deploy the frontend. Update Render `ALLOWED_ORIGINS` with the actual production origin, restart/redeploy the API, then rebuild Vercel if the API URL changed. Add exact preview URLs only when needed; there is intentionally no wildcard `*.vercel.app` CORS rule.
 6. Verify public `/health` and `/docs`, then run the synthetic sample workflow using real Gemini. Test PDF, DOCX, and TXT downloads and a manual edit. Check errors and both viewport sizes. Record actual URLs/results in `VERIFICATION.md` before submission.

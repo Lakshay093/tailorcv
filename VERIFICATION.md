@@ -6,15 +6,15 @@ Date: October 15, 2026 (Asia/Kolkata).
 
 | Check | Status |
 | --- | --- |
-| Backend pytest | 43 passed; mocked Gemini responses, real parsers and exporters. |
+| Backend pytest | 47 passed; mocked Gemini responses, real SDK serialization, parsers, and exporters. |
 | Next.js production build | Passed with Node 24.19.0. |
 | Lint/typecheck | Both passed. |
 | Desktop/mobile browser workflow | All 4 tests passed; actual HTTP parsing, tailoring, and exports with only Gemini mocked. Screenshots inspected at both widths. |
 | Sample PDF visual inspection | Passed: one selectable-text page with clear headings, wrapped text, and no clipping. |
-| Real Gemini smoke | Not run: no `GEMINI_API_KEY` supplied. |
+| Real Gemini smoke | Passed with `gemini-3.6-flash`: structuring, JD analysis, tailoring, factual validation, PDF and DOCX exports. |
 | Docker image execution | Not run: Docker CLI exists but the Docker Desktop engine is stopped/unavailable. |
 | Public frontend | Deployed to Vercel; unauthenticated HTTPS GET returned 200 and contained the TailorCV workspace. |
-| Public complete workflow | Not verified: Render access and Gemini credentials are missing. |
+| Public complete workflow | Backend deployment and API connection in progress. Gemini and Render credentials verified locally. |
 | GitHub Actions | First two Linux runs passed backend, lint/typecheck/build, and desktop/mobile browser jobs. |
 
 ## Repository and live URLs
