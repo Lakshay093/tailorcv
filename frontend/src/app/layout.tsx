@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "TailorCV — Your experience. The right words.",
+  title: "TailorCV — Resume Studio",
   description:
     "Thoughtfully tailor your resume to your next opportunity. Preserve your facts, review every change, and export a clean resume.",
 };

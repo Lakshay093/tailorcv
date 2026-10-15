@@ -5,19 +5,19 @@ import Link from "next/link";
 import {
   ArrowDown,
   ArrowRight,
-  ArrowUpRight,
   Check,
   CheckCheck,
   ChevronDown,
   CircleHelp,
+  BriefcaseBusiness,
+  ChevronRight,
+  PanelLeft,
   Download,
   FileCheck2,
   FileText,
-  Fingerprint,
   GitCompareArrows,
   LayoutTemplate,
   LoaderCircle,
-  LockKeyhole,
   Pencil,
   Plus,
   RotateCcw,
@@ -77,6 +77,10 @@ export function Workspace() {
   const [offline, setOffline] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [loadingSample, setLoadingSample] = useState(false);
+  const [checkingConnection, setCheckingConnection] = useState(true);
+  const helpDialog = useRef<HTMLDialogElement>(null);
+  const resetDialog = useRef<HTMLDialogElement>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -93,7 +97,8 @@ export function Workspace() {
       : jd.length > limits.jd_max_chars
         ? `Keep the description under ${limits.jd_max_chars.toLocaleString()} characters.`
         : "";
-  const busy = parsing || generating;
+  const busy = parsing || generating || loadingSample;
+  const ready = !!parsed?.structured_resume && !jdError && !!sections.length;
   const dirty = !!(
     result &&
     reviewed &&
@@ -103,8 +108,12 @@ export function Workspace() {
 
   useEffect(() => {
     getHealth()
-      .then(setHealth)
-      .catch(() => setOffline(true));
+      .then((data) => {
+        setHealth(data);
+        setOffline(false);
+      })
+      .catch(() => setOffline(true))
+      .finally(() => setCheckingConnection(false));
   }, []);
 
   function report(e: unknown) {
@@ -144,6 +153,7 @@ export function Workspace() {
     setError(null);
     try {
       const data = await parseResume(candidate);
+      setOffline(false);
       setFile(candidate);
       setParsed(data);
       setResult(null);
@@ -160,7 +170,8 @@ export function Workspace() {
   }
 
   async function loadSample() {
-    if (lock.current) return;
+    if (lock.current || loadingSample) return;
+    setLoadingSample(true);
     setError(null);
     try {
       const [job, document] = await Promise.all([
@@ -178,6 +189,8 @@ export function Workspace() {
       );
     } catch (e) {
       report(e);
+    } finally {
+      setLoadingSample(false);
     }
   }
 
@@ -195,6 +208,7 @@ export function Workspace() {
     setError(null);
     try {
       const data = await customizeResume(parsed, jd, sections);
+      setOffline(false);
       setResult(data);
       setReviewed(structuredClone(data.resume));
       setResultInput(JSON.stringify({ jd, sections }));
@@ -222,6 +236,7 @@ export function Workspace() {
     setError(null);
     try {
       await downloadResume(reviewed, format);
+      setOffline(false);
     } catch (e) {
       report(e);
     } finally {
@@ -229,835 +244,1078 @@ export function Workspace() {
     }
   }
 
+  function jumpTo(id: string) {
+    const target = document.getElementById(id);
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    target?.focus({ preventScroll: true });
+  }
+
+  function startOver() {
+    setJd("");
+    setTouched(false);
+    setFile(null);
+    setParsed(null);
+    setResult(null);
+    setReviewed(null);
+    setResultInput("");
+    setError(null);
+    setDragOver(false);
+    setEditing(false);
+    setTab("tailored");
+    setSections(["summary", "skills", "experience", "projects"]);
+    resetDialog.current?.close();
+    jumpTo("setup");
+  }
+
   return (
     <div className="app-shell">
       <a href="#main" className="skip-link">
         Skip to workspace
       </a>
-      <header className="topbar">
-        <div className="topbar-inner">
-          <Link className="brand" href="/" aria-label="TailorCV home">
-            <span className="brand-icon">
-              <FileText size={20} strokeWidth={1.8} />
-              <span />
-            </span>
-            tailor<span className="brand-cv">cv</span>
-            <span className="beta">BETA</span>
-          </Link>
-          <nav aria-label="Main navigation">
-            <a className="how-link" href="#how-it-works">
-              <CircleHelp size={15} /> How it works
-            </a>
-            <span className="nav-divider" />
-            <span className="private-label">
-              <LockKeyhole size={13} /> Your next chapter starts here
-            </span>
-          </nav>
+      <aside className="app-sidebar" aria-label="Workspace navigation">
+        <Link className="brand" href="/" aria-label="TailorCV home">
+          <span className="brand-icon">
+            <FileText size={21} />
+            <span />
+          </span>
+          tailor<span className="brand-cv">cv</span>
+          <span className="brand-period">.</span>
+        </Link>
+        <div className="sidebar-caption">YOUR WORKSPACE</div>
+        <a className="sidebar-active" href="#main">
+          <PanelLeft size={17} /> Resume studio{" "}
+          <span className="nav-indicator" />
+        </a>
+        <div className="sidebar-session">
+          <span className="sidebar-caption">THIS APPLICATION</span>
+          <strong>
+            {file ? file.name.replace(/\.[^.]+$/, "") : "Your next opportunity"}
+          </strong>
+          <small>
+            {result
+              ? "Ready for your review"
+              : parsed
+                ? "Resume added"
+                : "Let’s make it a great fit"}
+          </small>
         </div>
-      </header>
-
-      <main id="main" className="page-container">
-        <div className="intro">
-          <div>
-            <div className="eyebrow">
-              <span /> BUILT AROUND YOUR EXPERIENCE
-            </div>
-            <h1>
-              Your experience. <span>The right words.</span>
-            </h1>
-            <p>A resume that speaks to the role, while staying true to you.</p>
-          </div>
-          <div className="intro-note">
-            <span className="note-spark">
-              <Sparkles size={18} />
-            </span>
-            <div>
-              One thoughtful edit.
-              <br />
-              <strong>A new possibility.</strong>
-            </div>
-            <span className="note-doodle">↗</span>
-          </div>
-        </div>
-
-        <ol
-          id="how-it-works"
-          className="stepper"
-          aria-label="Resume customization steps"
-        >
-          <li
-            className={
-              jdCount >= limits.jd_min_chars && !jdError ? "complete" : "active"
-            }
+        <nav className="sidebar-steps" aria-label="Resume customization steps">
+          <button
+            className={result ? "done" : "current"}
+            onClick={() => jumpTo("setup")}
           >
-            <span className="step-index">
-              {jdCount >= limits.jd_min_chars && !jdError ? (
-                <Check size={14} />
+            <span>
+              {parsed?.structured_resume && !jdError ? (
+                <Check size={13} />
               ) : (
                 "1"
               )}
             </span>
             <div>
-              Add job description<small>Tell us about the opportunity</small>
+              Add your details<small>Resume & target role</small>
             </div>
-          </li>
-          <span className="step-connector" aria-hidden="true" />
-          <li
-            className={
-              parsed?.structured_resume
-                ? "complete"
-                : jdCount >= limits.jd_min_chars
-                  ? "active"
-                  : ""
-            }
+          </button>
+          <button
+            className={result ? "current" : ""}
+            onClick={() => jumpTo("preview")}
           >
-            <span className="step-index">
-              {parsed?.structured_resume ? <Check size={14} /> : "2"}
-            </span>
+            <span>{result ? <Check size={13} /> : "2"}</span>
             <div>
-              Upload your resume<small>Bring your experience</small>
+              Review & refine<small>You have the final say</small>
             </div>
-          </li>
-          <span className="step-connector" aria-hidden="true" />
-          <li className={result ? "complete" : ""}>
-            <span className="step-index">
-              {result ? <Check size={14} /> : "3"}
-            </span>
+          </button>
+          <button disabled={!result} onClick={() => jumpTo("downloads")}>
+            <span>3</span>
             <div>
-              Make it your own<small>Review, refine & download</small>
+              Download<small>Ready for your next step</small>
             </div>
-          </li>
-        </ol>
-
-        {offline && (
-          <div className="notice notice-warning">
-            <CircleHelp size={17} />
-            <p>
-              The backend is currently unreachable. Start the API or check its
-              public URL. Your inputs remain on this page.
-            </p>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                getHealth()
-                  .then((data) => {
-                    setHealth(data);
-                    setOffline(false);
-                  })
-                  .catch(report);
-              }}
+          </button>
+        </nav>
+        <div className="sidebar-bottom">
+          <div className="privacy-card">
+            <ShieldCheck size={21} />
+            <strong>Your story stays yours.</strong>
+            <p>No account. No resume history stored by TailorCV.</p>
+          </div>
+          <button
+            className="sidebar-help"
+            onClick={() => helpDialog.current?.showModal()}
+          >
+            <CircleHelp size={17} /> How it works <ChevronRight size={14} />
+          </button>
+          <span className="sidebar-footnote">Made for your next chapter.</span>
+        </div>
+      </aside>
+      <div className="app-content">
+        <header className="topbar">
+          <Link className="mobile-brand" href="/" aria-label="TailorCV home">
+            <FileText size={20} /> tailorcv<span>.</span>
+          </Link>
+          <div className="breadcrumbs">
+            <span>Workspace</span>
+            <ChevronRight size={13} />
+            <strong>Resume studio</strong>
+          </div>
+          <div className="topbar-actions">
+            <span className="session-badge">
+              <span /> Session only
+            </span>
+            <button
+              className="help-icon"
+              aria-label="How it works"
+              onClick={() => helpDialog.current?.showModal()}
             >
-              Retry connection
-            </Button>
-          </div>
-        )}
-        {health && !health.ai_configured && (
-          <div className="notice notice-warning">
-            <CircleHelp size={17} />
-            <p>
-              <strong>AI setup needed.</strong> Add GEMINI_API_KEY to the
-              backend environment. You can upload a file and inspect its
-              extracted text now; AI structuring and customization require the
-              key.
-            </p>
-          </div>
-        )}
-        {error && (
-          <div className="notice notice-error" role="alert">
-            <CircleHelp size={18} />
-            <div>
-              <strong>We couldn’t complete that step</strong>
-              <p>{error.message}</p>
-              {error.requestId && <small>Request ID: {error.requestId}</small>}
-            </div>
-            <button aria-label="Dismiss error" onClick={() => setError(null)}>
-              <X size={16} />
+              <CircleHelp size={18} />
             </button>
           </div>
-        )}
-
-        <div className="workspace-grid">
-          <aside className="inputs-panel" aria-label="Customization inputs">
-            <div className="input-panel-title">
-              <h2>Let’s find your fit</h2>
+        </header>
+        <main id="main" className="page-container">
+          <div className="intro">
+            <div>
+              <div className="eyebrow">
+                <span /> A LITTLE MORE YOU. A LOT MORE RELEVANT.
+              </div>
+              <h1>
+                A better fit for your <span>next role.</span>
+              </h1>
+              <p>
+                Bring your experience. We’ll help the right things stand out.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              className="sample-button"
+              disabled={busy}
+              onClick={loadSample}
+            >
+              {loadingSample ? (
+                <LoaderCircle className="animate-spin" />
+              ) : (
+                <Sparkles size={16} />
+              )}{" "}
+              Try sample data <ArrowRight size={14} />
+            </Button>
+          </div>
+          <div className="workspace-context">
+            <span>
+              <span className="live-dot" />{" "}
+              {generating
+                ? "Tailoring your resume"
+                : parsing
+                  ? "Reading your resume"
+                  : result
+                    ? "Your tailored resume is ready"
+                    : ready
+                      ? "Ready to make it your own"
+                      : parsed?.structured_resume
+                        ? "Resume added. Complete your application details."
+                        : "Let’s build your next application"}
+            </span>
+            <button
+              disabled={busy || (!file && !jd)}
+              onClick={() => resetDialog.current?.showModal()}
+            >
+              <RotateCcw size={13} /> Start over
+            </button>
+          </div>
+          <div className="mobile-switcher">
+            <button onClick={() => jumpTo("setup")}>
+              <BriefcaseBusiness size={15} /> Your details
+            </button>
+            <button onClick={() => jumpTo("preview")}>
+              <LayoutTemplate size={15} />{" "}
+              {result ? "Review resume" : "Resume preview"}
+              <ChevronRight size={14} />
+            </button>
+          </div>
+          {offline && (
+            <div className="notice notice-warning">
+              <CircleHelp size={17} />
+              <p>
+                The connection was interrupted. The server may be waking up.
+                Your inputs are still here; give it a moment and retry.
+              </p>
               <Button
                 variant="ghost"
                 size="sm"
-                className="sample-button"
-                disabled={busy}
-                onClick={loadSample}
+                disabled={checkingConnection}
+                onClick={() => {
+                  setCheckingConnection(true);
+                  getHealth()
+                    .then((data) => {
+                      setHealth(data);
+                      setOffline(false);
+                    })
+                    .catch(report)
+                    .finally(() => setCheckingConnection(false));
+                }}
               >
-                <Sparkles /> Try sample data
+                {checkingConnection ? "Connecting…" : "Retry connection"}
               </Button>
             </div>
-            <section className="input-section">
-              <div className="section-label">
-                <label htmlFor="job-description">
-                  <span className="tiny-step" aria-hidden="true">
-                    1
-                  </span>{" "}
-                  Job description
-                </label>
-                <span className="required-label">Required</span>
-              </div>
-              <p className="field-hint">Paste the role you have your eye on.</p>
-              <div className={`jd-wrap ${touched && jdError ? "invalid" : ""}`}>
-                <textarea
-                  id="job-description"
-                  aria-label="Job description"
-                  aria-describedby="jd-help jd-count"
-                  aria-invalid={!!(touched && jdError)}
-                  placeholder={
-                    "Paste the job description here…\n\nInclude responsibilities, required skills, and qualifications for the most relevant results."
-                  }
-                  value={jd}
-                  onChange={(e) => setJd(e.target.value)}
-                  onBlur={() => setTouched(true)}
-                  disabled={busy}
-                />
-                <div className="jd-meta">
-                  <span>
-                    {jd.length
-                      ? "Looking good? Include the full description."
-                      : "A little detail goes a long way"}
-                  </span>
-                  <span id="jd-count">
-                    {jd.length.toLocaleString()} /{" "}
-                    {limits.jd_max_chars.toLocaleString()}
-                  </span>
-                </div>
-              </div>
-              <p
-                id="jd-help"
-                className={touched && jdError ? "field-error" : "field-note"}
-              >
-                {touched && jdError
-                  ? jdError
-                  : `Minimum ${limits.jd_min_chars} non-whitespace characters`}
+          )}
+          {health && !health.ai_configured && (
+            <div className="notice notice-warning">
+              <CircleHelp size={17} />
+              <p>
+                <strong>AI customization is temporarily unavailable.</strong>{" "}
+                You can still upload a resume and inspect its extracted text.
               </p>
-            </section>
+            </div>
+          )}
+          {error && (
+            <div className="notice notice-error" role="alert">
+              <CircleHelp size={18} />
+              <div>
+                <strong>We couldn’t complete that step</strong>
+                <p>{error.message}</p>
+                {error.requestId && (
+                  <small>Request ID: {error.requestId}</small>
+                )}
+              </div>
+              <button aria-label="Dismiss error" onClick={() => setError(null)}>
+                <X size={16} />
+              </button>
+            </div>
+          )}
 
-            <section className="input-section upload-section">
-              <div className="section-label">
-                <label htmlFor="resume-file">
-                  <span className="tiny-step" aria-hidden="true">
-                    2
-                  </span>{" "}
-                  Your resume
-                </label>
-                <span className="file-types">PDF or DOCX</span>
+          <div className="workspace-grid">
+            <aside
+              id="setup"
+              tabIndex={-1}
+              className="inputs-panel"
+              aria-label="Customization inputs"
+            >
+              <div className="input-panel-title">
+                <div>
+                  <h2>Your application</h2>
+                  <p>Two inputs. One more relevant resume.</p>
+                </div>
+                <span className="input-progress">
+                  {Number(!!parsed?.structured_resume) + Number(!jdError)} / 2
+                  ready
+                </span>
               </div>
-              <p className="field-hint">
-                The experience you’ve already earned.
-              </p>
-              <input
-                id="resume-file"
-                aria-label="Your resume"
-                ref={picker}
-                type="file"
-                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                className="sr-only"
-                disabled={busy}
-                onChange={(e) => {
-                  const selected = e.target.files?.[0];
-                  if (selected) void upload(selected);
-                }}
-              />
-              {file && !parsing ? (
-                <div className="uploaded-file">
-                  <div className="file-badge">
-                    <FileText size={21} />
-                  </div>
-                  <div>
-                    <strong>{file.name}</strong>
-                    <small>
-                      {(file.size / 1024).toFixed(1)} KB ·{" "}
-                      {parsed?.structured_resume
-                        ? "Ready to tailor"
-                        : "Text extracted"}
-                    </small>
+              <section className="input-section upload-section">
+                <div className="section-label">
+                  <label htmlFor="resume-file">
+                    <span className="tiny-step" aria-hidden="true">
+                      1
+                    </span>{" "}
+                    Your resume
+                  </label>
+                  <span className="file-types">PDF or DOCX</span>
+                </div>
+                <p className="field-hint">
+                  Start with the experience you already have.
+                </p>
+                <input
+                  id="resume-file"
+                  aria-label="Your resume"
+                  ref={picker}
+                  type="file"
+                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  className="sr-only"
+                  disabled={busy}
+                  onChange={(e) => {
+                    const selected = e.target.files?.[0];
+                    if (selected) void upload(selected);
+                  }}
+                />
+                {file && !parsing ? (
+                  <div className="uploaded-file">
+                    <div className="file-badge">
+                      <FileText size={21} />
+                    </div>
+                    <div>
+                      <strong>{file.name}</strong>
+                      <small>
+                        {(file.size / 1024).toFixed(1)} KB ·{" "}
+                        {parsed?.structured_resume
+                          ? "Ready to tailor"
+                          : "Text extracted"}
+                      </small>
+                      <button
+                        disabled={busy}
+                        className="replace-button"
+                        onClick={() => picker.current?.click()}
+                      >
+                        Replace file
+                      </button>
+                    </div>
                     <button
                       disabled={busy}
-                      className="replace-button"
-                      onClick={() => picker.current?.click()}
+                      aria-label="Remove uploaded resume"
+                      className="remove-file"
+                      onClick={() => {
+                        setFile(null);
+                        setParsed(null);
+                        setResult(null);
+                        setReviewed(null);
+                      }}
                     >
-                      Replace file
+                      <X size={16} />
                     </button>
                   </div>
+                ) : (
                   <button
+                    type="button"
+                    className={`drop-zone ${dragOver ? "dragging" : ""}`}
                     disabled={busy}
-                    aria-label="Remove uploaded resume"
-                    className="remove-file"
+                    onClick={() => picker.current?.click()}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDragOver(true);
+                    }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragOver(false);
+                      if (e.dataTransfer.files[0])
+                        void upload(e.dataTransfer.files[0]);
+                    }}
+                    aria-label="Upload resume: choose or drop a PDF or DOCX"
+                  >
+                    <span className="upload-icon">
+                      {parsing ? (
+                        <LoaderCircle size={23} className="animate-spin" />
+                      ) : (
+                        <UploadCloud size={24} strokeWidth={1.6} />
+                      )}
+                    </span>
+                    <strong>
+                      {parsing ? (
+                        "Extracting & structuring…"
+                      ) : (
+                        <>
+                          <span>Choose your resume</span> or drop it here
+                        </>
+                      )}
+                    </strong>
+                    <small>
+                      {parsing
+                        ? "Reading your document with Gemini"
+                        : `PDF or DOCX · Up to ${limits.max_upload_mb} MB`}
+                    </small>
+                  </button>
+                )}
+                {parsed && (
+                  <details className="extraction-preview">
+                    <summary>
+                      <FileCheck2 size={14} /> Preview extracted text{" "}
+                      <ChevronDown size={14} />
+                    </summary>
+                    <pre>{parsed.original_text}</pre>
+                  </details>
+                )}
+                {parsed?.warnings.map((warning, i) => (
+                  <p className="parse-warning" key={`${warning.code}-${i}`}>
+                    {warning.message}
+                  </p>
+                ))}
+                {parsed && !parsed.structured_resume && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={busy}
+                    className="mt-2"
                     onClick={() => {
-                      setFile(null);
-                      setParsed(null);
-                      setResult(null);
-                      setReviewed(null);
+                      if (file) void upload(file);
                     }}
                   >
-                    <X size={16} />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  className={`drop-zone ${dragOver ? "dragging" : ""}`}
-                  disabled={busy}
-                  onClick={() => picker.current?.click()}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragOver(true);
-                  }}
-                  onDragLeave={() => setDragOver(false)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setDragOver(false);
-                    if (e.dataTransfer.files[0])
-                      void upload(e.dataTransfer.files[0]);
-                  }}
-                  aria-label="Upload resume: choose or drop a PDF or DOCX"
-                >
-                  <span className="upload-icon">
-                    {parsing ? (
-                      <LoaderCircle size={23} className="animate-spin" />
-                    ) : (
-                      <UploadCloud size={24} strokeWidth={1.6} />
-                    )}
-                  </span>
-                  <strong>
-                    {parsing ? (
-                      "Extracting & structuring…"
-                    ) : (
-                      <>
-                        <span>Click to upload</span> or drag and drop
-                      </>
-                    )}
-                  </strong>
-                  <small>
-                    {parsing
-                      ? "Reading your document with Gemini"
-                      : `PDF or DOCX · Up to ${limits.max_upload_mb} MB`}
-                  </small>
-                </button>
-              )}
-              {parsed && (
-                <details className="extraction-preview">
-                  <summary>
-                    <FileCheck2 size={14} /> Preview extracted text{" "}
-                    <ChevronDown size={14} />
-                  </summary>
-                  <pre>{parsed.original_text}</pre>
-                </details>
-              )}
-              {parsed?.warnings.map((warning, i) => (
-                <p className="parse-warning" key={`${warning.code}-${i}`}>
-                  {warning.message}
-                </p>
-              ))}
-              {parsed && !parsed.structured_resume && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={busy}
-                  className="mt-2"
-                  onClick={() => {
-                    if (file) void upload(file);
-                  }}
-                >
-                  <RotateCcw /> Retry AI structuring
-                </Button>
-              )}
-            </section>
+                    <RotateCcw /> Retry AI structuring
+                  </Button>
+                )}
+              </section>
 
-            <section className="input-section selection-section">
-              <div className="section-label">
-                <h3>
-                  <span className="tiny-step">3</span> What should we tailor?
-                </h3>
-              </div>
-              <p className="field-hint">
-                Choose the sections to give a little attention.
-              </p>
-              <div className="section-options">
-                {SECTIONS.map(({ key, label }) => (
-                  <button
-                    key={key}
-                    type="button"
-                    role="checkbox"
-                    aria-checked={sections.includes(key)}
-                    disabled={busy}
-                    onClick={() =>
-                      setSections((current) =>
-                        current.includes(key)
-                          ? current.filter((s) => s !== key)
-                          : [...current, key],
-                      )
+              <section className="input-section">
+                <div className="section-label">
+                  <label htmlFor="job-description">
+                    <span className="tiny-step" aria-hidden="true">
+                      2
+                    </span>{" "}
+                    Job description
+                  </label>
+                  <span className="required-label">Required</span>
+                </div>
+                <p className="field-hint">
+                  Paste the full job description for the best fit.
+                </p>
+                <div
+                  className={`jd-wrap ${touched && jdError ? "invalid" : ""}`}
+                >
+                  <textarea
+                    id="job-description"
+                    aria-label="Job description"
+                    aria-describedby="jd-help jd-count"
+                    aria-invalid={!!(touched && jdError)}
+                    placeholder={
+                      "Paste the job description here…\n\nInclude responsibilities, required skills, and qualifications for the most relevant results."
                     }
-                    className={sections.includes(key) ? "selected" : ""}
-                  >
+                    value={jd}
+                    onChange={(e) => setJd(e.target.value)}
+                    onBlur={() => setTouched(true)}
+                    disabled={busy}
+                  />
+                  <div className="jd-meta">
                     <span>
-                      {sections.includes(key) ? (
-                        <Check size={12} strokeWidth={3} />
-                      ) : (
-                        <Plus size={12} />
-                      )}
+                      {jd.length
+                        ? "Include the full description for context."
+                        : "Responsibilities, skills, qualifications…"}
                     </span>
-                    {label}
-                  </button>
-                ))}
-              </div>
-              {!sections.length && (
-                <p className="field-error">Select at least one section.</p>
-              )}
-            </section>
-
-            <div className="customize-area">
-              <Button
-                className="customize-button"
-                disabled={
-                  busy ||
-                  !parsed?.structured_resume ||
-                  !sections.length ||
-                  !!jdError
-                }
-                onClick={customize}
-              >
-                {generating ? (
-                  <LoaderCircle className="animate-spin" />
-                ) : (
-                  <Sparkles />
-                )}
-                {generating ? "Analyzing JD & tailoring…" : "Customize Resume"}
-                {!generating && <ArrowRight className="button-arrow" />}
-              </Button>
-              <p>
-                <LockKeyhole size={11} /> No account. No saved resume history.
-              </p>
-              <small>
-                Resume text and job descriptions are sent to Google Gemini for
-                AI processing. Review all changes before use.
-              </small>
-            </div>
-          </aside>
-
-          <section
-            className="results-panel"
-            ref={resultsRef}
-            aria-label="Results workspace"
-            aria-busy={busy}
-          >
-            <div className="workspace-heading">
-              <div className="workspace-heading-icon">
-                <LayoutTemplate size={18} />
-              </div>
-              <div>
-                <h2>Your resume workspace</h2>
-                <p>A thoughtful fit, with you in control.</p>
-              </div>
-              <span className={`status-badge ${result ? "ready" : ""}`}>
-                <span />
-                {generating
-                  ? "Tailoring"
-                  : parsing
-                    ? "Processing"
-                    : result
-                      ? "Ready to review"
-                      : parsed?.structured_resume
-                        ? "Resume added"
-                        : "Awaiting your resume"}
-              </span>
-            </div>
-
-            {generating ? (
-              <div className="processing-state" role="status">
-                <div className="processing-orbit">
-                  <Sparkles size={31} />
-                  <span />
+                    <span id="jd-count">
+                      {jd.length.toLocaleString()} /{" "}
+                      {limits.jd_max_chars.toLocaleString()}
+                    </span>
+                  </div>
                 </div>
-                <span className="eyebrow">A LITTLE THOUGHTFUL TAILORING</span>
-                <h3>Finding the right words.</h3>
-                <p>
-                  Analyzing the job description, tailoring your selected
-                  sections,
-                  <br className="desktop-break" /> and checking the result
-                  against your original experience.
+                <p
+                  id="jd-help"
+                  className={touched && jdError ? "field-error" : "field-note"}
+                >
+                  {touched && jdError
+                    ? jdError
+                    : `Minimum ${limits.jd_min_chars} non-whitespace characters`}
                 </p>
-                <div className="processing-details">
-                  <LoaderCircle size={15} className="animate-spin" /> Waiting
-                  for AI analysis and factual validation
+              </section>
+
+              <section className="input-section selection-section">
+                <div className="section-label">
+                  <h3>
+                    <Sparkles size={15} /> What should we tailor?
+                  </h3>
                 </div>
-                <small>Your experience stays the source of truth.</small>
-              </div>
-            ) : result && reviewed ? (
-              <>
-                <div className="result-summary">
-                  <div className="match-circle">
-                    <Target size={22} />
-                  </div>
-                  <div>
-                    <strong>
-                      Tailored for{" "}
-                      {result.job_analysis.role || "your next role"}
-                    </strong>
-                    <p>
-                      {result.changes.length} changes · {result.model}
-                    </p>
-                  </div>
-                  <CheckCheck size={20} className="text-emerald-600" />
-                </div>
-                {stale && (
-                  <div className="inline-note">
-                    Your inputs have changed. Customize again to create a result
-                    for the current JD and section selection.
-                  </div>
-                )}
-                <div className="score-strip">
-                  <div>
-                    <span className="score-label">KEYWORD MATCH ESTIMATE</span>
-                    <div className="score-values">
+                <p className="field-hint">
+                  Select what to refine. Everything else stays as it is.
+                </p>
+                <div className="section-options">
+                  {SECTIONS.map(({ key, label }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      role="checkbox"
+                      aria-checked={sections.includes(key)}
+                      disabled={busy}
+                      onClick={() =>
+                        setSections((current) =>
+                          current.includes(key)
+                            ? current.filter((s) => s !== key)
+                            : [...current, key],
+                        )
+                      }
+                      className={sections.includes(key) ? "selected" : ""}
+                    >
                       <span>
-                        {result.keyword_analysis.original.score}%{" "}
-                        <small>original</small>
+                        {sections.includes(key) ? (
+                          <Check size={12} strokeWidth={3} />
+                        ) : (
+                          <Plus size={12} />
+                        )}
                       </span>
-                      <ArrowRight size={15} />
-                      <strong>
-                        {result.keyword_analysis.tailored.score}%{" "}
-                        <small>tailored</small>
-                      </strong>
-                    </div>
-                  </div>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {!sections.length && (
+                  <p className="field-error">Select at least one section.</p>
+                )}
+              </section>
+
+              <div className="customize-area">
+                <Button
+                  className="customize-button"
+                  disabled={busy || !ready}
+                  onClick={customize}
+                >
+                  {generating ? (
+                    <LoaderCircle className="animate-spin" />
+                  ) : (
+                    <Sparkles />
+                  )}
+                  {generating
+                    ? "Analyzing JD & tailoring…"
+                    : "Customize Resume"}
+                  {!generating && <ArrowRight className="button-arrow" />}
+                </Button>
+                <p className="action-hint" aria-live="polite">
+                  {parsing
+                    ? "Reading and organizing your experience…"
+                    : generating
+                      ? "Checking each change against your original."
+                      : !parsed?.structured_resume
+                        ? "Upload your resume to get started."
+                        : jdError
+                          ? "Add the job description to continue."
+                          : !sections.length
+                            ? "Choose at least one section to tailor."
+                            : "All set. Let’s make it relevant."}
+                </p>
+                <small>
+                  Your resume and job description are sent to Google Gemini.
+                  Review every change before applying.
+                </small>
+              </div>
+            </aside>
+
+            <section
+              id="preview"
+              tabIndex={-1}
+              className="results-panel"
+              ref={resultsRef}
+              aria-label="Results workspace"
+              aria-busy={busy}
+            >
+              <div className="workspace-heading">
+                <div className="workspace-heading-icon">
+                  <LayoutTemplate size={18} />
+                </div>
+                <div>
+                  <h2>{result ? "Your tailored resume" : "Resume preview"}</h2>
                   <p>
-                    Heuristic estimate, not an official ATS score.
-                    {dirty && (
-                      <strong>
-                        {" "}
-                        Based on generated text; edits aren’t rescored.
-                      </strong>
-                    )}
+                    {result
+                      ? "Review it. Make it yours. Send it with confidence."
+                      : "Your experience, with a little more direction."}
                   </p>
                 </div>
-                <Tabs value={tab} onValueChange={setTab}>
-                  <TabsList aria-label="Result views">
-                    <TabsTrigger value="tailored">Tailored Resume</TabsTrigger>
-                    <TabsTrigger value="original">Original</TabsTrigger>
-                    <TabsTrigger value="changes">
-                      Changes{" "}
-                      <span className="tab-count">{result.changes.length}</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="suggestions">
-                      Suggestions{" "}
-                      {result.suggestions.length > 0 && (
-                        <span className="suggestion-dot" />
-                      )}
-                    </TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="tailored">
-                    <div className="document-toolbar">
-                      <span>
-                        <span className="document-dot" />
-                        {editing
-                          ? "Edit your resume below"
-                          : dirty
-                            ? "Your latest edits are included"
-                            : "Single-column · Ready for your review"}
-                      </span>
-                      <div>
-                        {dirty && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              setReviewed(structuredClone(result.resume))
-                            }
-                          >
-                            <RotateCcw /> Reset edits
-                          </Button>
-                        )}
-                        <Button
-                          variant={editing ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setEditing(!editing)}
-                        >
-                          {editing ? <Check /> : <Pencil />}
-                          {editing ? "Done editing" : "Edit resume"}
-                        </Button>
-                      </div>
+                <span className={`status-badge ${result ? "ready" : ""}`}>
+                  <span />
+                  {generating
+                    ? "Tailoring"
+                    : parsing
+                      ? "Processing"
+                      : result
+                        ? "Ready to review"
+                        : parsed?.structured_resume
+                          ? "Resume added"
+                          : "Awaiting your resume"}
+                </span>
+              </div>
+
+              {generating ? (
+                <div className="processing-state" role="status">
+                  <div className="processing-orbit">
+                    <Sparkles size={31} />
+                    <span />
+                  </div>
+                  <span className="eyebrow">
+                    GREAT EXPERIENCE. THE RIGHT WORDS.
+                  </span>
+                  <h3>Making your experience count.</h3>
+                  <p>
+                    Analyzing the job description, tailoring your selected
+                    sections,
+                    <br className="desktop-break" /> and checking the result
+                    against your original experience.
+                  </p>
+                  <div className="processing-details">
+                    <LoaderCircle size={15} className="animate-spin" /> Waiting
+                    for AI analysis and factual validation
+                  </div>
+                  <small>Your experience stays the source of truth.</small>
+                </div>
+              ) : result && reviewed ? (
+                <>
+                  <div className="result-summary">
+                    <div className="match-circle">
+                      <Target size={22} />
                     </div>
-                    {editing && (
-                      <div className="inline-note">
-                        Edits are yours to verify. All downloads use the current
-                        fields below.
-                      </div>
-                    )}
-                    <div className="document-surface">
-                      <ResumeView
-                        resume={reviewed}
-                        editing={editing}
-                        onChange={setReviewed}
-                      />
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="original">
-                    <div className="tab-content">
-                      <div className="tab-intro">
-                        <FileText size={20} />
-                        <div>
-                          <h3>Your original, unchanged</h3>
-                          <p>
-                            Extracted text is the source of truth. Compare it
-                            with the tailored version.
-                          </p>
-                        </div>
-                      </div>
-                      <pre className="original-text">
-                        {parsed?.original_text}
-                      </pre>
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="changes">
-                    <div className="tab-content">
-                      <div className="tab-intro">
-                        <GitCompareArrows size={20} />
-                        <div>
-                          <h3>Every change, in the open</h3>
-                          <p>
-                            {dirty
-                              ? "These comparisons show the AI-generated version, before your manual edits."
-                              : "Compare the wording and check the evidence behind each edit."}
-                          </p>
-                        </div>
-                      </div>
-                      {!result.changes.length && (
-                        <p className="empty-tab">
-                          Your selected sections already fit this role. No
-                          wording changes were needed.
-                        </p>
-                      )}
-                      {result.changes.map((change, i) => (
-                        <div
-                          className="change-card"
-                          key={`${change.entry_id}-${i}`}
-                        >
-                          <div className="change-title">
-                            <strong>{change.section}</strong>
-                            <span>{change.kind}</span>
-                          </div>
-                          <div className="change-before">
-                            <span>BEFORE</span>
-                            <p>
-                              <del>{change.before}</del>
-                            </p>
-                          </div>
-                          <div className="change-after">
-                            <span>AFTER</span>
-                            <p>
-                              <ins>{change.after}</ins>
-                            </p>
-                          </div>
-                          <p className="change-reason">{change.explanation}</p>
-                          <details>
-                            <summary>View source excerpt</summary>
-                            <blockquote>{change.source_excerpt}</blockquote>
-                          </details>
-                        </div>
-                      ))}
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="suggestions">
-                    <div className="tab-content">
-                      <div className="tab-intro">
-                        <Sparkles size={20} />
-                        <div>
-                          <h3>Opportunities to consider</h3>
-                          <p>
-                            Missing terms stay outside your resume. Add them
-                            only if your experience supports them.
-                          </p>
-                        </div>
-                      </div>
-                      <div className="keyword-group">
-                        <h4>Matched in the tailored resume</h4>
-                        <div>
-                          {result.keyword_analysis.tailored.matched.map(
-                            (term) => (
-                              <span className="keyword matched" key={term}>
-                                <Check size={12} />
-                                {term}
-                              </span>
-                            ),
-                          )}
-                          {!result.keyword_analysis.tailored.matched.length && (
-                            <p>No exact term matches found.</p>
-                          )}
-                        </div>
-                      </div>
-                      {result.suggestions.map((s) => (
-                        <div className="suggestion-card" key={s.keyword}>
-                          <div>
-                            <Plus size={15} />
-                            <strong>{s.keyword}</strong>
-                            <span>Confirm first</span>
-                          </div>
-                          <p>{s.message}</p>
-                        </div>
-                      ))}
-                      {!result.suggestions.length && (
-                        <p className="empty-tab">
-                          All extracted JD terms are explicitly present in your
-                          original resume.
-                        </p>
-                      )}
-                      <p className="method-note">
-                        {result.keyword_analysis.method}
+                    <div>
+                      <strong>
+                        Tailored for{" "}
+                        {result.job_analysis.role || "your next role"}
+                      </strong>
+                      <p>
+                        {result.changes.length} wording improvements · Based on
+                        your original experience
                       </p>
                     </div>
-                  </TabsContent>
-                </Tabs>
-                <details className="review-warnings">
-                  <summary>
-                    <ShieldCheck size={15} /> Review notes (
-                    {result.warnings.length}) <ChevronDown size={14} />
-                  </summary>
-                  {result.warnings.map((w, i) => (
-                    <p key={i}>{w.message}</p>
-                  ))}
-                </details>
-                <div className="download-bar">
-                  <div>
-                    <Download size={16} />
-                    <span>
-                      {dirty
-                        ? "Download with your edits"
-                        : "Take the next step"}
-                      <small>Analysis stays out of your document.</small>
-                    </span>
+                    <CheckCheck size={20} className="text-emerald-600" />
                   </div>
-                  <div className="download-buttons">
-                    {(["pdf", "docx", "txt"] as const).map((format) => (
-                      <Button
-                        key={format}
-                        variant={format === "pdf" ? "default" : "outline"}
-                        size="sm"
-                        disabled={!!downloading}
-                        onClick={() => download(format)}
-                      >
-                        {downloading === format ? (
-                          <LoaderCircle className="animate-spin" />
-                        ) : (
-                          <ArrowDown />
+                  {stale && (
+                    <div className="inline-note">
+                      Your inputs have changed. Customize again to create a
+                      result for the current JD and section selection.
+                    </div>
+                  )}
+                  <div className="score-strip">
+                    <div>
+                      <span className="score-label">
+                        KEYWORD MATCH ESTIMATE
+                      </span>
+                      <div className="score-values">
+                        <span>
+                          {result.keyword_analysis.original.score}%{" "}
+                          <small>original</small>
+                        </span>
+                        <ArrowRight size={15} />
+                        <strong>
+                          {result.keyword_analysis.tailored.score}%{" "}
+                          <small>tailored</small>
+                        </strong>
+                      </div>
+                    </div>
+                    <p>
+                      Heuristic estimate, not an official ATS score.
+                      {dirty && (
+                        <strong>
+                          {" "}
+                          Based on generated text; edits aren’t rescored.
+                        </strong>
+                      )}
+                    </p>
+                  </div>
+                  <div className="download-bar" id="downloads" tabIndex={-1}>
+                    <div>
+                      <Download size={16} />
+                      <span>
+                        {dirty
+                          ? "Download with your edits"
+                          : "Download your resume"}
+                        <small>Clean formatting. Only your resume.</small>
+                      </span>
+                    </div>
+                    <div className="download-buttons">
+                      {(["pdf", "docx", "txt"] as const).map((format) => (
+                        <Button
+                          key={format}
+                          variant={format === "pdf" ? "default" : "outline"}
+                          size="sm"
+                          aria-disabled={!!downloading}
+                          aria-busy={downloading === format}
+                          onClick={() => download(format)}
+                        >
+                          {downloading === format ? (
+                            <LoaderCircle className="animate-spin" />
+                          ) : (
+                            <ArrowDown />
+                          )}
+                          {format.toUpperCase()}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  <Tabs value={tab} onValueChange={setTab}>
+                    <TabsList aria-label="Result views">
+                      <TabsTrigger value="tailored">
+                        Tailored Resume
+                      </TabsTrigger>
+                      <TabsTrigger value="original">Original</TabsTrigger>
+                      <TabsTrigger value="changes">
+                        Changes{" "}
+                        <span className="tab-count">
+                          {result.changes.length}
+                        </span>
+                      </TabsTrigger>
+                      <TabsTrigger value="suggestions">
+                        Suggestions{" "}
+                        {result.suggestions.length > 0 && (
+                          <span className="suggestion-dot" />
                         )}
-                        {format.toUpperCase()}
-                      </Button>
+                      </TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="tailored">
+                      <div className="document-toolbar">
+                        <span>
+                          <span className="document-dot" />
+                          {editing
+                            ? "Edit your resume below"
+                            : dirty
+                              ? "Your latest edits are included"
+                              : "Single-column · Ready for your review"}
+                        </span>
+                        <div>
+                          {dirty && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                setReviewed(structuredClone(result.resume))
+                              }
+                            >
+                              <RotateCcw /> Reset edits
+                            </Button>
+                          )}
+                          <Button
+                            variant={editing ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setEditing(!editing)}
+                          >
+                            {editing ? <Check /> : <Pencil />}
+                            {editing ? "Done editing" : "Edit resume"}
+                          </Button>
+                        </div>
+                      </div>
+                      {editing && (
+                        <div className="inline-note">
+                          Edits are yours to verify. All downloads use the
+                          current fields below.
+                        </div>
+                      )}
+                      <div className="document-surface">
+                        <ResumeView
+                          resume={reviewed}
+                          editing={editing}
+                          onChange={setReviewed}
+                        />
+                      </div>
+                    </TabsContent>
+                    <TabsContent value="original">
+                      <div className="tab-content">
+                        <div className="tab-intro">
+                          <FileText size={20} />
+                          <div>
+                            <h3>Your original, unchanged</h3>
+                            <p>
+                              Extracted text is the source of truth. Compare it
+                              with the tailored version.
+                            </p>
+                          </div>
+                        </div>
+                        <pre className="original-text">
+                          {parsed?.original_text}
+                        </pre>
+                      </div>
+                    </TabsContent>
+                    <TabsContent value="changes">
+                      <div className="tab-content">
+                        <div className="tab-intro">
+                          <GitCompareArrows size={20} />
+                          <div>
+                            <h3>Every change, in the open</h3>
+                            <p>
+                              {dirty
+                                ? "These comparisons show the AI-generated version, before your manual edits."
+                                : "Compare the wording and check the evidence behind each edit."}
+                            </p>
+                          </div>
+                        </div>
+                        {!result.changes.length && (
+                          <p className="empty-tab">
+                            Your selected sections already fit this role. No
+                            wording changes were needed.
+                          </p>
+                        )}
+                        {result.changes.map((change, i) => (
+                          <div
+                            className="change-card"
+                            key={`${change.entry_id}-${i}`}
+                          >
+                            <div className="change-title">
+                              <strong>{change.section}</strong>
+                              <span>{change.kind}</span>
+                            </div>
+                            <div className="change-before">
+                              <span>BEFORE</span>
+                              <p>
+                                <del>{change.before}</del>
+                              </p>
+                            </div>
+                            <div className="change-after">
+                              <span>AFTER</span>
+                              <p>
+                                <ins>{change.after}</ins>
+                              </p>
+                            </div>
+                            <p className="change-reason">
+                              {change.explanation}
+                            </p>
+                            <details>
+                              <summary>View source excerpt</summary>
+                              <blockquote>{change.source_excerpt}</blockquote>
+                            </details>
+                          </div>
+                        ))}
+                      </div>
+                    </TabsContent>
+                    <TabsContent value="suggestions">
+                      <div className="tab-content">
+                        <div className="tab-intro">
+                          <Sparkles size={20} />
+                          <div>
+                            <h3>Opportunities to consider</h3>
+                            <p>
+                              Missing terms stay outside your resume. Add them
+                              only if your experience supports them.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="keyword-group">
+                          <h4>Matched in the tailored resume</h4>
+                          <div>
+                            {result.keyword_analysis.tailored.matched.map(
+                              (term) => (
+                                <span className="keyword matched" key={term}>
+                                  <Check size={12} />
+                                  {term}
+                                </span>
+                              ),
+                            )}
+                            {!result.keyword_analysis.tailored.matched
+                              .length && <p>No exact term matches found.</p>}
+                          </div>
+                        </div>
+                        {result.suggestions.map((s) => (
+                          <div className="suggestion-card" key={s.keyword}>
+                            <div>
+                              <Plus size={15} />
+                              <strong>{s.keyword}</strong>
+                              <span>Confirm first</span>
+                            </div>
+                            <p>{s.message}</p>
+                          </div>
+                        ))}
+                        {!result.suggestions.length && (
+                          <p className="empty-tab">
+                            All extracted JD terms are explicitly present in
+                            your original resume.
+                          </p>
+                        )}
+                        <p className="method-note">
+                          {result.keyword_analysis.method}
+                        </p>
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                  <details className="review-warnings">
+                    <summary>
+                      <ShieldCheck size={15} /> Review notes (
+                      {result.warnings.length}) <ChevronDown size={14} />
+                    </summary>
+                    {result.warnings.map((w, i) => (
+                      <p key={i}>{w.message}</p>
                     ))}
+                  </details>
+                </>
+              ) : parsed?.structured_resume ? (
+                <>
+                  <div className="preview-note">
+                    <FileCheck2 size={17} />
+                    <div>
+                      <strong>Your experience is in.</strong>
+                      <p>
+                        {jdError
+                          ? "Add a job description to tailor this resume to the role."
+                          : "Choose your sections, then customize to see the difference."}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="empty-tabs" aria-hidden="true">
-                  <span className="empty-active">Tailored Resume</span>
-                  <span>Original</span>
-                  <span>Changes</span>
-                  <span>Suggestions</span>
-                  <span className="empty-tabs-right">
-                    <Pencil size={14} /> Make it yours
-                  </span>
-                </div>
+                  <div className="document-toolbar">
+                    <span>
+                      <span className="document-dot" /> Original resume · Before
+                      tailoring
+                    </span>
+                    <span>Preview</span>
+                  </div>
+                  <div className="document-surface original-preview">
+                    <ResumeView resume={parsed.structured_resume} />
+                  </div>
+                </>
+              ) : (
                 <div className="empty-workspace">
-                  <div className="preview-composition" aria-hidden="true">
-                    <div className="floating-check">
-                      <Check size={18} strokeWidth={2.4} />
+                  <div className="preview-grid" aria-hidden="true">
+                    <span className="preview-label">
+                      <span /> A little more relevant
+                    </span>
+                    <div className="preview-sheet">
+                      <div className="preview-sheet-top">
+                        <div className="preview-monogram">
+                          <FileText size={24} strokeWidth={1.4} />
+                        </div>
+                        <div>
+                          <i />
+                          <i />
+                        </div>
+                      </div>
+                      <div className="preview-rule" />
+                      {[0, 1, 2].map((n) => (
+                        <div className="preview-block" key={n}>
+                          <b />
+                          <i />
+                          <i />
+                          <i />
+                        </div>
+                      ))}
+                      <span className="preview-page-number">
+                        01 / YOUR NEXT CHAPTER
+                      </span>
                     </div>
-                    <div className="mini-document">
-                      <div className="mini-avatar">AM</div>
-                      <div className="mini-name" />
-                      <div className="mini-contact" />
-                      <div className="mini-rule" />
-                      <div className="mini-section" />
-                      <div className="mini-line long" />
-                      <div className="mini-line" />
-                      <div className="mini-line medium" />
-                      <div className="mini-section second" />
-                      <div className="mini-line long" />
-                      <div className="mini-line medium" />
-                      <div className="mini-line" />
-                    </div>
-                    <div className="floating-spark">
-                      <Sparkles size={22} strokeWidth={1.7} />
-                    </div>
-                    <div className="fit-tag">
-                      <span /> Made for your next move
+                    <div className="preview-stamp">
+                      <Check size={14} /> Your experience. Better expressed.
                     </div>
                   </div>
                   <div className="empty-copy">
                     <span className="empty-eyebrow">
-                      SAME YOU. A SHARPER STORY.
+                      A STRONGER FIRST IMPRESSION
                     </span>
                     <h3>
-                      Your next opportunity,
+                      Your story deserves
                       <br />
-                      meet your experience.
+                      the right words.
                     </h3>
                     <p>
-                      Add a job description and your resume.
+                      Upload your resume and add a target role.
                       <br />
-                      We’ll help the right things stand out.
+                      Your tailored version will take shape here.
                     </p>
-                    <div className="empty-pill">
-                      <ShieldCheck size={14} /> Your facts stay yours. Always.
-                    </div>
+                    <button
+                      className="empty-upload"
+                      disabled={busy}
+                      onClick={() => picker.current?.click()}
+                    >
+                      Add your resume <ArrowRight size={15} />
+                    </button>
                   </div>
-                </div>
-                <div className="workspace-bottom">
-                  <div>
-                    <Fingerprint size={19} />
+                  <div className="preview-promises">
                     <span>
-                      <strong>Authentically you</strong>
-                      <small>Only your real experience</small>
+                      <ShieldCheck size={15} /> Facts stay factual
                     </span>
-                  </div>
-                  <div>
-                    <GitCompareArrows size={19} />
                     <span>
-                      <strong>Every edit, explained</strong>
-                      <small>You have the final word</small>
+                      <Pencil size={14} /> Every word is editable
                     </span>
-                  </div>
-                  <div>
-                    <Download size={19} />
                     <span>
-                      <strong>Ready when you are</strong>
-                      <small>PDF, DOCX & plain text</small>
+                      <Download size={14} /> Export in 3 formats
                     </span>
                   </div>
                 </div>
-              </>
-            )}
-            <span className="sr-only" role="status" aria-live="polite">
-              {parsing
-                ? "Extracting and structuring your resume."
-                : generating
-                  ? "Analyzing job description and tailoring selected sections."
-                  : result
-                    ? "Your tailored resume is ready to review."
-                    : parsed
-                      ? "Resume text extracted. Check the parsing preview."
-                      : ""}
-            </span>
-          </section>
-        </div>
+              )}
+              <span className="sr-only" role="status" aria-live="polite">
+                {parsing
+                  ? "Extracting and structuring your resume."
+                  : generating
+                    ? "Analyzing job description and tailoring selected sections."
+                    : result
+                      ? "Your tailored resume is ready to review."
+                      : parsed
+                        ? "Resume text extracted. Check the parsing preview."
+                        : ""}
+              </span>
+            </section>
+          </div>
 
-        <footer className="page-footer">
-          <span>
-            <ShieldCheck size={14} /> Thoughtful AI. Your experience at the
-            center.
+          <footer className="page-footer">
+            <span>
+              <ShieldCheck size={14} /> Real experience. Relevant words. Always
+              you.
+            </span>
+            <button onClick={() => helpDialog.current?.showModal()}>
+              How TailorCV works <ChevronRight size={13} />
+            </button>
+          </footer>
+        </main>
+      </div>
+      <dialog
+        ref={helpDialog}
+        className="app-dialog"
+        aria-labelledby="help-title"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) helpDialog.current?.close();
+        }}
+      >
+        <div className="dialog-header">
+          <span className="dialog-icon">
+            <Sparkles size={22} />
           </span>
-          <span>
-            Built for your next chapter <ArrowUpRight size={13} />
+          <button
+            className="help-icon"
+            aria-label="Close help"
+            onClick={() => helpDialog.current?.close()}
+          >
+            <X size={19} />
+          </button>
+        </div>
+        <span className="eyebrow">A LITTLE GUIDANCE</span>
+        <h2 id="help-title">
+          Your next application,
+          <br />
+          with more intention.
+        </h2>
+        <p>
+          TailorCV helps you express the experience you already have in the
+          language of your next role.
+        </p>
+        <ol className="help-steps">
+          <li>
+            <span>1</span>
+            <div>
+              <strong>Bring your experience</strong>
+              <p>
+                Upload a text-based PDF or DOCX, then paste the job description.
+              </p>
+            </div>
+          </li>
+          <li>
+            <span>2</span>
+            <div>
+              <strong>Make it relevant</strong>
+              <p>
+                Choose the sections to tailor. Compare every change, review
+                suggestions, and edit the final wording.
+              </p>
+            </div>
+          </li>
+          <li>
+            <span>3</span>
+            <div>
+              <strong>Take the next step</strong>
+              <p>
+                Download your reviewed resume as a PDF, DOCX, or plain text
+                file.
+              </p>
+            </div>
+          </li>
+        </ol>
+        <div className="dialog-privacy">
+          <ShieldCheck size={19} />
+          <p>
+            TailorCV keeps no resume history. Your resume and job description
+            are sent to Google Gemini for processing. Refreshing the page clears
+            this workspace.
+          </p>
+        </div>
+        <Button
+          className="dialog-cta"
+          onClick={() => helpDialog.current?.close()}
+        >
+          Got it, let’s get started <ArrowRight size={16} />
+        </Button>
+      </dialog>
+      <dialog
+        ref={resetDialog}
+        className="app-dialog reset-dialog"
+        aria-labelledby="reset-title"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) resetDialog.current?.close();
+        }}
+      >
+        <div className="dialog-header">
+          <span className="dialog-icon">
+            <RotateCcw size={22} />
           </span>
-        </footer>
-      </main>
+          <button
+            className="help-icon"
+            aria-label="Close reset confirmation"
+            onClick={() => resetDialog.current?.close()}
+          >
+            <X size={19} />
+          </button>
+        </div>
+        <h2 id="reset-title">Start a new application?</h2>
+        <p>
+          This clears the resume, job description, and edits in this workspace.
+          Download anything you want to keep first.
+        </p>
+        <div className="dialog-actions">
+          <Button
+            variant="outline"
+            onClick={() => resetDialog.current?.close()}
+          >
+            Keep working
+          </Button>
+          <Button onClick={startOver}>
+            Start fresh <ArrowRight size={15} />
+          </Button>
+        </div>
+      </dialog>
     </div>
   );
 }

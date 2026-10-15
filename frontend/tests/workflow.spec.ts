@@ -9,9 +9,13 @@ test("upload, tailor, review, edit, and download via the real backend", async ({
 }, testInfo) => {
   const browserErrors: string[] = [];
   page.on("pageerror", (e) => browserErrors.push(e.message));
+  const connected = page.waitForResponse((response) =>
+    response.url().endsWith("/health"),
+  );
   await page.goto("/");
+  await connected;
   await expect(
-    page.getByRole("heading", { name: "Your experience. The right words." }),
+    page.getByRole("heading", { name: "A better fit for your next role." }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Customize Resume", exact: true }),
@@ -31,6 +35,13 @@ test("upload, tailor, review, edit, and download via the real backend", async ({
   await expect(
     page.getByText("Ready to tailor", { exact: false }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("article", { name: "Resume document" }),
+  ).toContainText("Alex Morgan");
+  await expect(
+    page.getByText("Original resume · Before tailoring"),
+  ).toBeVisible();
+  await expect(page.getByText("2 / 2 ready")).toBeVisible();
   await page.getByText("Preview extracted text").click();
   await expect(page.locator(".extraction-preview pre")).toContainText(
     "Alex Morgan",
@@ -90,11 +101,59 @@ test("upload, tailor, review, edit, and download via the real backend", async ({
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
+  await expect(
+    page.getByRole("button", { name: "DOCX", exact: true }),
+  ).toBeFocused();
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
   await page.screenshot({
     path: testInfo.outputPath("reviewed.png"),
     fullPage: true,
   });
   expect(browserErrors).toEqual([]);
+});
+
+test("preview, connection recovery, help, and start-over keep the user in control", async ({
+  page,
+}) => {
+  await page.route("**/health", (route) => route.abort("connectionfailed"));
+  await page.goto("/");
+  await expect(
+    page.getByText("The connection was interrupted.", { exact: false }),
+  ).toBeVisible();
+  await page
+    .locator(".topbar")
+    .getByRole("button", { name: "How it works", exact: true })
+    .click();
+  const help = page.getByRole("dialog", { name: /Your next application/ });
+  await expect(help).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(help).not.toBeVisible();
+  await page
+    .getByLabel("Your resume", { exact: true })
+    .setInputFiles(path.join(samples, "alex-morgan.docx"));
+  await expect(page.getByRole("article")).toContainText("Alex Morgan");
+  await expect(
+    page.getByText("The connection was interrupted.", { exact: false }),
+  ).not.toBeVisible();
+  await page
+    .getByLabel("Job description", { exact: true })
+    .fill("An application I want to keep while reviewing the new interface.");
+  await page.getByRole("button", { name: "Start over", exact: true }).click();
+  const reset = page.getByRole("dialog", { name: "Start a new application?" });
+  await expect(reset).toBeVisible();
+  await reset.getByRole("button", { name: "Keep working" }).click();
+  await expect(page.getByLabel("Job description", { exact: true })).toHaveValue(
+    "An application I want to keep while reviewing the new interface.",
+  );
+  await expect(page.getByRole("article")).toContainText("Alex Morgan");
+  await page.getByRole("button", { name: "Start over", exact: true }).click();
+  await reset.getByRole("button", { name: "Start fresh" }).click();
+  await expect(reset).not.toBeVisible();
+  await expect(page.getByLabel("Job description", { exact: true })).toBeEmpty();
+  await expect(page.getByRole("article")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Customize Resume", exact: true }),
+  ).toBeDisabled();
 });
 
 test("failed replacement preserves the existing upload and JD", async ({
@@ -105,13 +164,11 @@ test("failed replacement preserves the existing upload and JD", async ({
   await expect(
     page.getByText("Ready to tailor", { exact: false }),
   ).toBeVisible();
-  await page
-    .getByLabel("Your resume", { exact: true })
-    .setInputFiles({
-      name: "renamed.pdf",
-      mimeType: "application/pdf",
-      buffer: Buffer.from("This is not a PDF"),
-    });
+  await page.getByLabel("Your resume", { exact: true }).setInputFiles({
+    name: "renamed.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("This is not a PDF"),
+  });
   await expect(
     page
       .getByRole("alert")

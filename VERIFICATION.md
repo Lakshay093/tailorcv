@@ -9,7 +9,7 @@ Date: October 15, 2026 (Asia/Kolkata).
 | Backend pytest | 47 passed; mocked Gemini responses, real SDK serialization, parsers, and exporters. |
 | Next.js production build | Passed with Node 24.19.0. |
 | Lint/typecheck | Both passed. |
-| Desktop/mobile browser workflow | All 4 tests passed; actual HTTP parsing, tailoring, and exports with only Gemini mocked. Screenshots inspected at both widths. |
+| Desktop/mobile browser workflow | All 6 tests passed after the Resume Studio redesign; actual HTTP parsing, tailoring, and exports with only Gemini mocked. Includes immediate previews, help, confirmed reset, connection recovery, download focus, and preserved inputs. Screenshots inspected at both widths. |
 | Sample PDF visual inspection | Passed: one selectable-text page with clear headings, wrapped text, and no clipping. |
 | Real Gemini smoke | Passed with `gemini-3.6-flash`: structuring, JD analysis, tailoring, factual validation, PDF and DOCX exports. |
 | Docker image execution | Render built the Docker image, started the container, and passed `/health`. Local Docker Desktop execution was unavailable because its engine was stopped. |
@@ -43,4 +43,4 @@ Starlette 1.8 emits a deprecation warning for its httpx-backed TestClient; the t
 
 ESLint 9.39.5 is the latest compatible major for the peer ranges of Next.js's React/import/accessibility lint plugins. npm marks ESLint 9 unsupported; moving to ESLint 10 currently produces peer-range warnings. This maintenance limitation is confined to development tooling. Runtime dependencies are unaffected.
 
-The repository and complete public application are available, and real-provider verification is separate from the 47 backend checks and four mocked browser checks. To rerun the public test, set `LIVE_APP_URL=https://tailorcv-orcin.vercel.app` and run `npm run test:live` from `frontend/`. It makes actual Gemini calls using only synthetic sample data.
+The repository and complete public application are available, and real-provider verification is separate from the 47 backend checks and six mocked browser checks. To rerun the public test, set `LIVE_APP_URL=https://tailorcv-orcin.vercel.app` and run `npm run test:live` from `frontend/`. It makes actual Gemini calls using only synthetic sample data.

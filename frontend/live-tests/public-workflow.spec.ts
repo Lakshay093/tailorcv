@@ -6,7 +6,18 @@ test("real public Gemini workflow, edited downloads, and responsive review", asy
 }, testInfo) => {
   const browserErrors: string[] = [];
   page.on("pageerror", (error) => browserErrors.push(error.message));
+  const connected = page.waitForResponse((response) =>
+    response.url().endsWith("/health"),
+  );
   await page.goto("/");
+  await connected;
+  await expect(
+    page.getByRole("heading", { name: "A better fit for your next role." }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("public-empty-desktop.png"),
+    fullPage: true,
+  });
   const parseResponse = page.waitForResponse(
     (response) =>
       response.url().endsWith("/api/resume/parse") &&
@@ -21,6 +32,10 @@ test("real public Gemini workflow, edited downloads, and responsive review", asy
   await expect(
     page.getByText("Ready to tailor", { exact: false }),
   ).toBeVisible();
+  await expect(
+    page.getByText("Original resume · Before tailoring"),
+  ).toBeVisible();
+  await expect(page.getByRole("article")).toContainText("Alex Morgan");
   await expect(
     page.getByLabel("Job description", { exact: true }),
   ).not.toBeEmpty();
@@ -71,6 +86,7 @@ test("real public Gemini workflow, edited downloads, and responsive review", asy
     if (format === "TXT")
       expect(content.toString("utf-8")).toContain(editedSummary);
   }
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
   await page.screenshot({
     path: testInfo.outputPath("public-desktop.png"),
     fullPage: true,

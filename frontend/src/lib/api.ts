@@ -28,7 +28,7 @@ async function request(
 ): Promise<Response> {
   if (!BASE_URL)
     throw new ApiError(
-      "The frontend deployment needs NEXT_PUBLIC_API_BASE_URL configured with its backend URL.",
+      "The app’s connection settings aren’t available. Reload the page to get the latest version.",
       "BACKEND_NOT_CONFIGURED",
     );
   const controller = new AbortController();
@@ -57,14 +57,14 @@ async function request(
         "CLIENT_TIMEOUT",
       );
     throw new ApiError(
-      "We couldn’t reach the server. Check your connection and the backend URL, then try again.",
+      "The connection was interrupted. Your inputs are still here. Give it a moment, then try again.",
     );
   } finally {
     clearTimeout(timer);
   }
 }
 export async function getHealth(): Promise<Health> {
-  return (await request("/health", {}, 15000)).json();
+  return (await request("/health", {}, 90000)).json();
 }
 export async function parseResume(file: File): Promise<ParsedResume> {
   const form = new FormData();
@@ -108,6 +108,8 @@ export async function downloadResume(
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
+  link.hidden = true;
+  link.tabIndex = -1;
   link.href = url;
   link.download = `tailorcv-resume.${format}`;
   document.body.appendChild(link);

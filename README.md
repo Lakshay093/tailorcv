@@ -6,6 +6,8 @@ A working resume customization app: add a job description, upload a PDF or DOCX,
 
 Source is published at [Lakshay093/tailorcv](https://github.com/Lakshay093/tailorcv). The [public app](https://tailorcv-orcin.vercel.app) connects to the [Render API](https://tailorcv-api-amdh.onrender.com/health). The deployed workflow has passed a real Gemini browser test covering upload, tailoring, protected fields, editing, all three downloads, and desktop/mobile layouts. Full results and hosting limitations are recorded in [VERIFICATION.md](VERIFICATION.md). Mocked automated tests and live-provider checks are reported separately.
 
+The Resume Studio interface starts with your uploaded resume and immediately previews its structured content. Add the target role, choose the sections to tailor, compare changes, edit the result, and export from the controls above the document. Desktop step navigation, mobile preview shortcuts, keyboard-accessible help, and a confirmed reset keep the current application easy to manage. The connection check allows 90 seconds for the demo backend to wake up, and successful requests clear a stale connection notice.
+
 ## Stack
 
 - Frontend: Next.js 16.4.1 App Router, React 19.3.1, TypeScript 6.0.3, Tailwind CSS 4.3.3, shadcn-style source-owned Button/Tabs components using Radix and CVA, Lucide icons.
@@ -177,7 +179,7 @@ npm run test:e2e
 LIVE_APP_URL=https://tailorcv-orcin.vercel.app npm run test:live
 ```
 
-Playwright launches the real frontend and FastAPI server on ports 3000 and 8001. Only Gemini is replaced by a test dependency override in `tests.mock_server`; the production application has no mock-mode setting. The browser workflow covers upload, JD entry, extraction preview, selection, customization, changes/suggestions, editing, three downloads, errors, and preserved inputs. It runs on desktop and mobile viewports, checks for browser exceptions and horizontal overflow, and captures screenshots. Backend tests validate exported file content after edits. CI repeats backend, frontend, and browser checks on Linux.
+Playwright launches the real frontend and FastAPI server on ports 3000 and 8001. Only Gemini is replaced by a test dependency override in `tests.mock_server`; the production application has no mock-mode setting. The six desktop/mobile browser checks cover immediate resume previews, JD entry, extraction, section selection, customization, changes/suggestions, editing, three downloads, keyboard focus, help, connection recovery, reset confirmation, errors, and preserved inputs. They check for browser exceptions and horizontal overflow and capture screenshots. Backend tests validate exported file content after edits. CI repeats backend, frontend, and browser checks on Linux.
 
 The browser suite must own its test ports; stop a local frontend on port 3000 before running it. Linux CI uses `npx playwright install --with-deps chromium`. The Windows test config selects `.venv/Scripts/python.exe`; Linux uses `.venv/bin/python`. Override with `E2E_PYTHON` if necessary. The public test uses live Gemini calls and is deliberately excluded from normal CI. On PowerShell run `$env:LIVE_APP_URL='https://tailorcv-orcin.vercel.app'` followed by `npm run test:live`. It uploads only the synthetic sample, verifies protected fields and unselected projects, edits the result, downloads all three formats, and inspects both viewport sizes without duplicating generation for mobile.
 
