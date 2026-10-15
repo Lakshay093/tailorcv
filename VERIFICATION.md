@@ -17,7 +17,7 @@ Date: October 15, 2026 (Asia/Kolkata).
 
 ## Repository and live URLs
 
-- Repository: [Lakshay093/tailorcv](https://github.com/Lakshay093/tailorcv), created; source push pending final checks.
+- Repository: [Lakshay093/tailorcv](https://github.com/Lakshay093/tailorcv), source pushed on `codex/tailorcv`.
 - Frontend: not yet deployed.
 - Backend: not yet deployed.
 
