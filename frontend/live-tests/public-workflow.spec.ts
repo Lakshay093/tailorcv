@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Response } from "@playwright/test";
 import fs from "node:fs/promises";
 
 test("real public Gemini workflow, edited downloads, and responsive review", async ({
@@ -40,18 +40,52 @@ test("real public Gemini workflow, edited downloads, and responsive review", asy
     page.getByLabel("Job description", { exact: true }),
   ).not.toBeEmpty();
   await page.getByRole("checkbox", { name: "Projects", exact: true }).click();
-  const customizeResponse = page.waitForResponse(
-    (response) =>
-      response.url().endsWith("/api/resume/customize") &&
-      response.request().method() === "POST",
-    { timeout: 180000 },
-  );
-  await page
-    .getByRole("button", { name: "Customize Resume", exact: true })
-    .click();
-  const tailoredResponse = await customizeResponse;
-  expect(tailoredResponse.status()).toBe(200);
-  const result = await tailoredResponse.json();
+  let tailoredResponse: Response | undefined;
+  let lastFailure: { code?: string; message?: string } | undefined;
+  // Exercise the visible retry path once for transient provider failures or a
+  // safely rejected generation. Every rejection remains in the test report.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const customizeResponse = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/api/resume/customize") &&
+        response.request().method() === "POST",
+      { timeout: 180000 },
+    );
+    await page
+      .getByRole("button", { name: "Customize Resume", exact: true })
+      .click();
+    tailoredResponse = await customizeResponse;
+    if (tailoredResponse.status() === 200) break;
+    const failure = await tailoredResponse.json();
+    lastFailure = failure.error;
+    await testInfo.attach(`generation-attempt-${attempt + 1}`, {
+      body: JSON.stringify(failure),
+      contentType: "application/json",
+    });
+    await expect(page.getByRole("alert")).toContainText(failure.error.message);
+    await expect(page.getByRole("article")).toContainText("Alex Morgan");
+    await expect(
+      page.getByLabel("Job description", { exact: true }),
+    ).not.toBeEmpty();
+    await expect(
+      page.getByRole("checkbox", { name: "Projects", exact: true }),
+    ).not.toBeChecked();
+    if (
+      ![
+        "PROVIDER_UNAVAILABLE",
+        "PROVIDER_TIMEOUT",
+        "FACTUAL_VALIDATION_FAILED",
+      ].includes(failure.error?.code)
+    )
+      break;
+  }
+  expect(
+    tailoredResponse?.status(),
+    lastFailure
+      ? `Live generation: ${lastFailure.code}: ${lastFailure.message}`
+      : undefined,
+  ).toBe(200);
+  const result = await tailoredResponse!.json();
   expect(result.model).toBe("gemini-3.6-flash");
   expect(result.resume.contact).toEqual(parsed.structured_resume.contact);
   expect(result.resume.education).toEqual(parsed.structured_resume.education);
