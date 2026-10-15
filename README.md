@@ -4,7 +4,7 @@ A working resume customization app: add a job description, upload a PDF or DOCX,
 
 ## Submission status
 
-The application is implemented locally. Repository/public deployment URLs and final verification results are recorded in [VERIFICATION.md](VERIFICATION.md). A real Gemini smoke test requires a valid backend API key. Mocked tests are explicitly distinguished from live provider verification. The assessment is **not submission-ready until a real repository and a working public application, including real Gemini processing, are verified**.
+Source is published at [Lakshay093/tailorcv](https://github.com/Lakshay093/tailorcv). The [Vercel frontend](https://tailorcv-orcin.vercel.app) is public, with its backend connection pending. Full verification results and exact external setup steps are recorded in [VERIFICATION.md](VERIFICATION.md). A real Gemini smoke test requires a valid backend API key. Mocked tests are explicitly distinguished from live provider verification. The assessment is **not submission-ready until the Render backend and complete public workflow, including real Gemini processing, are verified**.
 
 ## Stack
 
