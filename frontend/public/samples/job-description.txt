@@ -1,0 +1,15 @@
+Software Engineer, Product Platform
+
+We are looking for a Software Engineer who enjoys building reliable, thoughtful web products. You will work with product designers and engineers to develop customer-facing features and improve our backend services.
+
+Requirements
+- Experience building applications with Python, TypeScript, and React.
+- Comfortable designing REST APIs and working with PostgreSQL.
+- A practical understanding of automated testing and Git.
+- Strong collaboration and clear technical communication.
+
+Preferred
+- Experience with Docker and Kubernetes.
+- Familiarity with accessibility and performance optimization.
+
+Help us build tools that make everyday work simpler. We value curiosity, ownership, and careful attention to the people using our products.

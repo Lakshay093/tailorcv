@@ -1,0 +1,41 @@
+Alex Morgan
+
+alex.morgan@example.com | +1 202 555 0142 | Austin, TX | github.com/alexmorgan-example
+
+Summary
+
+Software engineer building accessible web applications with TypeScript, React, and Python. Experienced in REST APIs, automated testing, and collaborative product development.
+
+Skills
+
+TypeScript · React · Python · PostgreSQL · REST APIs · Git · Docker · automated testing · accessibility
+
+Experience
+
+Software Engineer | Cedar Labs | Austin, TX
+
+Jun 2022 - Present
+
+• Built React and TypeScript dashboards used by 120 internal users.
+
+• Developed Python REST APIs backed by PostgreSQL and reduced response time by 25%.
+
+• Added automated testing and collaborated with designers on accessibility improvements.
+
+Projects
+
+Community Library
+
+An open-source lending tracker for a neighborhood library.
+
+• Created a Python application with PostgreSQL and packaged it with Docker.
+
+Education
+
+B.S. Computer Science | Hillcrest University
+
+2018 - 2022
+
+Volunteering
+
+Mentor at a community coding club.

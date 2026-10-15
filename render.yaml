@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: tailorcv-api
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    # Assessment/demo tier. Sleeps after 15 idle minutes; use paid compute for production.
+    plan: free
+    autoDeployTrigger: commit
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.8-flash
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: RESUME_SIGNING_KEY
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+      - key: MAX_UPLOAD_MB
+        value: "5"
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "10"

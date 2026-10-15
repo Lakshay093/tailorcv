@@ -1,0 +1,83 @@
+{
+  "contact": {
+    "name": "Alex Morgan",
+    "email": "alex.morgan@example.com",
+    "phone": "+1 202 555 0142",
+    "location": "Austin, TX",
+    "links": [
+      "github.com/alexmorgan-example"
+    ]
+  },
+  "summary": "Software engineer building accessible web applications with TypeScript, React, and Python. Experienced in REST APIs, automated testing, and collaborative product development.",
+  "skills": [
+    "TypeScript",
+    "React",
+    "Python",
+    "PostgreSQL",
+    "REST APIs",
+    "Git",
+    "Docker",
+    "automated testing",
+    "accessibility"
+  ],
+  "experience": [
+    {
+      "id": "experience-1",
+      "employer": "Cedar Labs",
+      "title": "Software Engineer",
+      "location": "Austin, TX",
+      "start_date": "Jun 2022",
+      "end_date": "Present",
+      "bullets": [
+        {
+          "id": "experience-1-bullet-1",
+          "text": "Built React and TypeScript dashboards used by 120 internal users.",
+          "source_excerpt": "Built React and TypeScript dashboards used by 120 internal users."
+        },
+        {
+          "id": "experience-1-bullet-2",
+          "text": "Developed Python REST APIs backed by PostgreSQL and reduced response time by 25%.",
+          "source_excerpt": "Developed Python REST APIs backed by PostgreSQL and reduced response time by 25%."
+        },
+        {
+          "id": "experience-1-bullet-3",
+          "text": "Added automated testing and collaborated with designers on accessibility improvements.",
+          "source_excerpt": "Added automated testing and collaborated with designers on accessibility improvements."
+        }
+      ]
+    }
+  ],
+  "education": [
+    {
+      "id": "education-1",
+      "institution": "Hillcrest University",
+      "qualification": "B.S. Computer Science",
+      "dates": "2018 - 2022",
+      "details": []
+    }
+  ],
+  "projects": [
+    {
+      "id": "projects-1",
+      "name": "Community Library",
+      "description": "An open-source lending tracker for a neighborhood library.",
+      "bullets": [
+        {
+          "id": "projects-1-bullet-1",
+          "text": "Created a Python application with PostgreSQL and packaged it with Docker.",
+          "source_excerpt": "Created a Python application with PostgreSQL and packaged it with Docker."
+        }
+      ]
+    }
+  ],
+  "certifications": [],
+  "additional_sections": [
+    {
+      "id": "additional_sections-1",
+      "title": "Volunteering",
+      "items": [
+        "Mentor at a community coding club."
+      ]
+    }
+  ]
+}
