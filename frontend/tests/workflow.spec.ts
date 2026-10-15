@@ -19,11 +19,20 @@ test("upload, tailor, review, edit, and download via the real backend", async ({
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Customize Resume", exact: true }),
-  ).toBeDisabled();
+  ).toBeEnabled();
   await page.screenshot({
     path: testInfo.outputPath("empty.png"),
     fullPage: true,
   });
+  await page
+    .getByRole("button", { name: "Customize Resume", exact: true })
+    .click();
+  await expect(
+    page.getByRole("alert", { name: "We couldn’t complete that step" }),
+  ).toContainText("Upload a PDF or DOCX resume before customizing.");
+  await expect(
+    page.getByRole("alert", { name: "We couldn’t complete that step" }),
+  ).toBeFocused();
   await page
     .getByLabel("Job description", { exact: true })
     .fill(
@@ -41,7 +50,7 @@ test("upload, tailor, review, edit, and download via the real backend", async ({
   await expect(
     page.getByText("Original resume · Before tailoring"),
   ).toBeVisible();
-  await expect(page.getByText("2 / 2 ready")).toBeVisible();
+  await expect(page.getByText("2 / 2 inputs added")).toBeVisible();
   await page.getByText("Preview extracted text").click();
   await expect(page.locator(".extraction-preview pre")).toContainText(
     "Alex Morgan",
@@ -153,7 +162,109 @@ test("preview, connection recovery, help, and start-over keep the user in contro
   await expect(page.getByRole("article")).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Customize Resume", exact: true }),
-  ).toBeDisabled();
+  ).toBeEnabled();
+});
+
+test("Customize explains quota and validation blockers, then works after preparation recovers", async ({
+  page,
+}, testInfo) => {
+  let parseCount = 0;
+  let customizeRequests = 0;
+  page.on("request", (request) => {
+    if (
+      request.url().endsWith("/api/resume/customize") &&
+      request.method() === "POST"
+    )
+      customizeRequests++;
+  });
+  await page.route("**/api/resume/parse", async (route) => {
+    const response = await route.fetch();
+    const parsed = await response.json();
+    parseCount++;
+    if (parseCount === 1) {
+      await route.fulfill({
+        response,
+        json: {
+          ...parsed,
+          structured_resume: null,
+          source_token: null,
+          warnings: [
+            {
+              code: "PROVIDER_QUOTA",
+              message:
+                "Text extracted, but the daily provider quota has been reached.",
+            },
+          ],
+        },
+      });
+    } else await route.fulfill({ response });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Try sample data" }).click();
+  await expect(page.getByText("2 / 2 inputs added")).toBeVisible();
+  await expect(
+    page.getByText("Resume uploaded. AI quota reached.", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("Extracted resume text", { exact: true }),
+  ).toContainText("Alex Morgan");
+  await expect(
+    page.getByText("Upload your resume to get started.", { exact: true }),
+  ).not.toBeVisible();
+  const customize = page.getByRole("button", {
+    name: "Customize Resume",
+    exact: true,
+  });
+  await customize.click();
+  await expect(
+    page.getByRole("alert", { name: "We couldn’t complete that step" }),
+  ).toContainText("Gemini’s free daily quota has been reached");
+  await expect(
+    page.getByRole("alert", { name: "We couldn’t complete that step" }),
+  ).toBeFocused();
+  expect(customizeRequests).toBe(0);
+  await expect(
+    page.getByText("alex-morgan.docx", { exact: true }),
+  ).toBeVisible();
+  const job = page.getByLabel("Job description", { exact: true });
+  const originalJob = await job.inputValue();
+  expect(originalJob.length).toBeGreaterThan(100);
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+  await page.screenshot({
+    path: testInfo.outputPath("quota-button-feedback.png"),
+    fullPage: true,
+  });
+  await page
+    .getByRole("button", { name: "Retry AI structuring", exact: true })
+    .click();
+  await expect(
+    page.getByText("Ready to tailor", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("alert", { name: "We couldn’t complete that step" }),
+  ).not.toBeVisible();
+  await expect(job).toHaveValue(originalJob);
+  await job.fill("Too short");
+  await customize.click();
+  await expect(
+    page.getByRole("alert", { name: "We couldn’t complete that step" }),
+  ).toContainText("Add at least 100 non-whitespace characters");
+  expect(customizeRequests).toBe(0);
+  await job.fill(originalJob);
+  for (const checkbox of await page.getByRole("checkbox").all())
+    await checkbox.click();
+  await customize.click();
+  await expect(
+    page.getByRole("alert", { name: "We couldn’t complete that step" }),
+  ).toContainText("Choose at least one section to customize.");
+  expect(customizeRequests).toBe(0);
+  await page.getByRole("checkbox", { name: "Summary", exact: true }).click();
+  await customize.click();
+  await expect(
+    page.getByRole("tab", { name: "Tailored Resume", exact: true }),
+  ).toBeVisible();
+  expect(customizeRequests).toBe(1);
+  await expect(page.getByRole("article")).toContainText("Alex Morgan");
 });
 
 test("failed replacement preserves the existing upload and JD", async ({

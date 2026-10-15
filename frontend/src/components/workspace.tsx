@@ -58,6 +58,10 @@ const SECTIONS: { key: Section; label: string }[] = [
   { key: "experience", label: "Experience" },
   { key: "projects", label: "Projects" },
 ];
+const QUOTA_MESSAGE =
+  "Your resume is uploaded, but Gemini’s free daily quota has been reached. Customization is paused until the quota resets. Keep this tab open, then use Retry AI structuring.";
+const PREPARATION_MESSAGE =
+  "Your resume is uploaded, but AI preparation did not finish. Use Retry AI structuring before customizing; you do not need to upload the file again.";
 
 export function Workspace() {
   const [jd, setJd] = useState("");
@@ -89,6 +93,7 @@ export function Workspace() {
   const picker = useRef<HTMLInputElement>(null);
   const lock = useRef(false);
   const resultsRef = useRef<HTMLDivElement>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
   const limits = health?.limits || DEFAULT_LIMITS;
   const jdCount = jd.replace(/\s/g, "").length;
   const jdError =
@@ -98,7 +103,17 @@ export function Workspace() {
         ? `Keep the description under ${limits.jd_max_chars.toLocaleString()} characters.`
         : "";
   const busy = parsing || generating || loadingSample;
-  const ready = !!parsed?.structured_resume && !jdError && !!sections.length;
+  const structuringBlocked =
+    !!parsed && (!parsed.structured_resume || !parsed.source_token);
+  const quotaReached =
+    structuringBlocked &&
+    !!parsed?.warnings.some((warning) => warning.code === "PROVIDER_QUOTA");
+  const preparationMessage = quotaReached ? QUOTA_MESSAGE : PREPARATION_MESSAGE;
+  const ready =
+    !!parsed?.structured_resume &&
+    !!parsed.source_token &&
+    !jdError &&
+    !!sections.length;
   const dirty = !!(
     result &&
     reviewed &&
@@ -115,6 +130,10 @@ export function Workspace() {
       .catch(() => setOffline(true))
       .finally(() => setCheckingConnection(false));
   }, []);
+
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
 
   function report(e: unknown) {
     setError(
@@ -196,13 +215,30 @@ export function Workspace() {
 
   async function customize() {
     setTouched(true);
-    if (
-      lock.current ||
-      jdError ||
-      !parsed?.structured_resume ||
-      !sections.length
-    )
-      return;
+    if (lock.current || busy) return;
+    if (!parsed)
+      return report(
+        new ApiError(
+          "Upload a PDF or DOCX resume before customizing.",
+          "RESUME_REQUIRED",
+        ),
+      );
+    if (structuringBlocked)
+      return report(
+        new ApiError(
+          preparationMessage,
+          quotaReached ? "PROVIDER_QUOTA" : "RESUME_NOT_PREPARED",
+        ),
+      );
+    if (jdError)
+      return report(new ApiError(jdError, "JOB_DESCRIPTION_REQUIRED"));
+    if (!sections.length)
+      return report(
+        new ApiError(
+          "Choose at least one section to customize.",
+          "SECTIONS_REQUIRED",
+        ),
+      );
     lock.current = true;
     setGenerating(true);
     setError(null);
@@ -407,9 +443,13 @@ export function Workspace() {
                     ? "Your tailored resume is ready"
                     : ready
                       ? "Ready to make it your own"
-                      : parsed?.structured_resume
-                        ? "Resume added. Complete your application details."
-                        : "Let’s build your next application"}
+                      : quotaReached
+                        ? "AI quota reached. Your resume is preserved."
+                        : structuringBlocked
+                          ? "Resume uploaded. AI preparation needs a retry."
+                          : parsed
+                            ? "Resume added. Complete your application details."
+                            : "Let’s build your next application"}
             </span>
             <button
               disabled={busy || (!file && !jd)}
@@ -464,10 +504,18 @@ export function Workspace() {
             </div>
           )}
           {error && (
-            <div className="notice notice-error" role="alert">
+            <div
+              className="notice notice-error"
+              role="alert"
+              aria-labelledby="workspace-error-title"
+              ref={errorRef}
+              tabIndex={-1}
+            >
               <CircleHelp size={18} />
               <div>
-                <strong>We couldn’t complete that step</strong>
+                <strong id="workspace-error-title">
+                  We couldn’t complete that step
+                </strong>
                 <p>{error.message}</p>
                 {error.requestId && (
                   <small>Request ID: {error.requestId}</small>
@@ -492,8 +540,8 @@ export function Workspace() {
                   <p>Two inputs. One more relevant resume.</p>
                 </div>
                 <span className="input-progress">
-                  {Number(!!parsed?.structured_resume) + Number(!jdError)} / 2
-                  ready
+                  {Number(!!parsed?.original_text) + Number(!jdError)} / 2
+                  inputs added
                 </span>
               </div>
               <section className="input-section upload-section">
@@ -724,7 +772,8 @@ export function Workspace() {
               <div className="customize-area">
                 <Button
                   className="customize-button"
-                  disabled={busy || !ready}
+                  disabled={busy}
+                  aria-describedby="customize-help"
                   onClick={customize}
                 >
                   {generating ? (
@@ -737,18 +786,24 @@ export function Workspace() {
                     : "Customize Resume"}
                   {!generating && <ArrowRight className="button-arrow" />}
                 </Button>
-                <p className="action-hint" aria-live="polite">
+                <p
+                  id="customize-help"
+                  className={`action-hint ${structuringBlocked ? "preparation-blocked" : ""}`}
+                  aria-live="polite"
+                >
                   {parsing
                     ? "Reading and organizing your experience…"
                     : generating
                       ? "Checking each change against your original."
-                      : !parsed?.structured_resume
-                        ? "Upload your resume to get started."
-                        : jdError
-                          ? "Add the job description to continue."
-                          : !sections.length
-                            ? "Choose at least one section to tailor."
-                            : "All set. Let’s make it relevant."}
+                      : structuringBlocked
+                        ? preparationMessage
+                        : !parsed
+                          ? "Upload your resume to get started."
+                          : jdError
+                            ? "Add the job description to continue."
+                            : !sections.length
+                              ? "Choose at least one section to tailor."
+                              : "All set. Let’s make it relevant."}
                 </p>
                 <small>
                   Your resume and job description are sent to Google Gemini.
@@ -785,9 +840,13 @@ export function Workspace() {
                       ? "Processing"
                       : result
                         ? "Ready to review"
-                        : parsed?.structured_resume
-                          ? "Resume added"
-                          : "Awaiting your resume"}
+                        : quotaReached
+                          ? "AI quota reached"
+                          : parsed?.structured_resume
+                            ? "Resume added"
+                            : parsed
+                              ? "Text extracted"
+                              : "Awaiting your resume"}
                 </span>
               </div>
 
@@ -1109,6 +1168,32 @@ export function Workspace() {
                   <div className="document-surface original-preview">
                     <ResumeView resume={parsed.structured_resume} />
                   </div>
+                </>
+              ) : parsed ? (
+                <>
+                  <div className="preview-note" role="status">
+                    <FileCheck2 size={17} />
+                    <div>
+                      <strong>
+                        {quotaReached
+                          ? "Resume uploaded. AI quota reached."
+                          : "Resume uploaded. AI preparation incomplete."}
+                      </strong>
+                      <p>{preparationMessage}</p>
+                    </div>
+                  </div>
+                  <div className="document-toolbar">
+                    <span>
+                      <span className="document-dot" /> Extracted resume text ·
+                      Before tailoring
+                    </span>
+                  </div>
+                  <pre
+                    className="original-text extracted-text-preview"
+                    aria-label="Extracted resume text"
+                  >
+                    {parsed.original_text}
+                  </pre>
                 </>
               ) : (
                 <div className="empty-workspace">

@@ -1452,6 +1452,25 @@ h1 > span {
   border: 1px solid #e7eddd;
   border-radius: 7px;
 }
+.action-hint.preparation-blocked {
+  padding: 12px;
+  border: 1px solid #e8ddc0;
+  border-radius: 7px;
+  background: #fffaf0;
+  color: #806328;
+  font-size: 11px;
+  text-align: left;
+}
+.extracted-text-preview {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 24px;
+  max-height: 760px;
+  overflow: auto;
+  color: #536248;
+  font-size: 12px;
+}
 .change-card {
   border: 1px solid #e3eadb;
   border-radius: 7px;

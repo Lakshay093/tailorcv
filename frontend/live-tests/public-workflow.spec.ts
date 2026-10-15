@@ -62,7 +62,9 @@ test("real public Gemini workflow, edited downloads, and responsive review", asy
       body: JSON.stringify(failure),
       contentType: "application/json",
     });
-    await expect(page.getByRole("alert")).toContainText(failure.error.message);
+    await expect(
+      page.getByRole("alert", { name: "We couldn’t complete that step" }),
+    ).toContainText(failure.error.message);
     await expect(page.getByRole("article")).toContainText("Alex Morgan");
     await expect(
       page.getByLabel("Job description", { exact: true }),
