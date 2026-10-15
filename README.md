@@ -4,7 +4,7 @@ A working resume customization app: add a job description, upload a PDF or DOCX,
 
 ## Submission status
 
-Source is published at [Lakshay093/tailorcv](https://github.com/Lakshay093/tailorcv). The [public app](https://tailorcv-orcin.vercel.app) connects to the [Render API](https://tailorcv-api-amdh.onrender.com/health). The deployed workflow has passed a real Gemini browser test covering upload, tailoring, protected fields, editing, all three downloads, and desktop/mobile layouts. Full results and hosting limitations are recorded in [VERIFICATION.md](VERIFICATION.md). Mocked automated tests and live-provider checks are reported separately.
+Source is published at [Lakshay093/tailorcv](https://github.com/Lakshay093/tailorcv). The [public app](https://tailorcv-orcin.vercel.app) connects to the [Render API](https://tailorcv-api-amdh.onrender.com/health). Before the interface redesign, the deployed workflow passed a real Gemini browser test covering upload, tailoring, protected fields, editing, all three downloads, and desktop/mobile layouts. The latest full live check after the redesign was blocked by Gemini quota; the updated Customize button passed a public check without AI calls, and all eight mocked-provider browser tests passed. Full results and hosting limitations are recorded in [VERIFICATION.md](VERIFICATION.md). Mocked automated tests and live-provider checks are reported separately.
 
 The Resume Studio interface starts with your uploaded resume and immediately previews its structured content. Add the target role, choose the sections to tailor, compare changes, edit the result, and export from the controls above the document. Desktop step navigation, mobile preview shortcuts, keyboard-accessible help, and a confirmed reset keep the current application easy to manage. The connection check allows 90 seconds for the demo backend to wake up, and successful requests clear a stale connection notice.
 
@@ -20,32 +20,64 @@ Customize Resume stays available for validation whenever the app is idle. Clicki
 
 Direct dependencies are pinned. `frontend/package-lock.json` and `backend/uv.lock` lock transitive dependencies. Use Node 24 LTS and Python 3.12. Node 21 is outside the supported runtime range.
 
+## AI tools used
+
+| Tool | How it was used |
+| --- | --- |
+| OpenAI Codex | Coding assistant for implementation, interface design, debugging, automated test development, documentation, and deployment assistance. |
+| Google Gemini through the official `google-genai` SDK | Runtime AI for structuring extracted resume text, analyzing the job description, and rewriting selected resume sections. The configured model is `gemini-3.6-flash`; it can be changed through backend configuration. |
+
+PDF/DOCX text extraction, factual validation, keyword scoring, change comparisons, and file generation run in application code. Gemini output is validated and still requires the user's review. Automated tests use synthetic resumes and provider doubles; separate opt-in checks exercise the real Gemini service. No API keys, account tokens, or private resume content are required in the repository.
+
 ## Local setup
 
-Install [Node 24](https://nodejs.org/en/download), [Python 3.12](https://www.python.org/downloads/), and [uv 0.13.1](https://docs.astral.sh/uv/getting-started/installation/). If needed, install uv with `python -m pip install uv==0.13.1`.
+Install Git, [Node 24](https://nodejs.org/en/download), [Python 3.12](https://www.python.org/downloads/), and [uv 0.13.1](https://docs.astral.sh/uv/getting-started/installation/). If needed, install uv with `python -m pip install uv==0.13.1`. Docker is optional for local development.
 
-In one terminal:
+Clone the repository, or use your existing checkout:
 
-```bash
+```powershell
+git clone https://github.com/Lakshay093/tailorcv.git
+cd tailorcv
+```
+
+The following commands use PowerShell. On macOS/Linux, replace `Copy-Item` with `cp`.
+
+### 1. Start the backend
+
+In a terminal opened at the repository root:
+
+```powershell
 cd backend
 uv sync --frozen --python 3.12
-cp .env.example .env
-# Edit .env: set GEMINI_API_KEY. Keep it only on the backend.
+Copy-Item .env.example .env
+```
+
+Edit `backend/.env` and set `GEMINI_API_KEY` to your own key from [Google AI Studio](https://aistudio.google.com/api-keys). Keep the example's other values for local development. The example signing key is for local use only; production requires the random key described below. Copy environment examples only on first setup so existing local values are preserved.
+
+Then, from `backend/`, run:
+
+```powershell
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-access-log
 ```
 
-In another terminal:
+### 2. Start the frontend
 
-```bash
+Open a second terminal at the repository root:
+
+```powershell
 cd frontend
 npm ci
-cp .env.example .env.local
+Copy-Item .env.example .env.local
 npm run dev
 ```
 
-On PowerShell replace `cp` with `Copy-Item` if desired. Open [localhost:3000](http://localhost:3000). The API docs are at [localhost:8000/docs](http://localhost:8000/docs).
+The frontend example already sets `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000`. Restart the frontend after changing it. Leave both terminals running. Open [localhost:3000](http://localhost:3000); check the API at [localhost:8000/health](http://localhost:8000/health) or its interactive docs at [localhost:8000/docs](http://localhost:8000/docs).
 
-Without a key, upload still extracts real text and displays a clear setup warning; AI structuring/customization cannot run. **Try sample data** loads a synthetic DOCX and JD through the same production parsing/AI pipeline. It does not substitute canned AI results. Test doubles exist only under `backend/tests/`.
+### 3. Try the workflow
+
+Choose **Try sample data**, or upload the synthetic [PDF](samples/alex-morgan.pdf) / [DOCX](samples/alex-morgan.docx) and paste the [sample job description](samples/job-description.txt). A custom JD needs at least 100 non-whitespace characters. Wait for AI structuring, select sections, click **Customize Resume**, review and edit the result, then download PDF, DOCX, or TXT. No login or database setup is required.
+
+Without a key, upload still extracts real text and displays a clear setup warning; AI structuring/customization cannot run. **Try sample data** loads a synthetic DOCX and JD through the same production parsing/AI pipeline. It does not substitute canned AI results. Provider doubles and simulated API failures are confined to test code.
 
 ## Environment
 
@@ -67,6 +99,13 @@ Without a key, upload still extracts real text and displays a clear setup warnin
 | `NEXT_PUBLIC_API_BASE_URL` | Frontend only: `http://localhost:8000` locally; Render HTTPS API URL in production. It is public and compiled at frontend build time. |
 
 Generate a production signing key with `python -c "import secrets; print(secrets.token_urlsafe(48))"`. Store it in the hosting secret manager, never source control.
+
+### Credentials and private data
+
+- Commit only the environment examples. Real `.env` files, `.env.local`, local deployment helpers, and `.vercel` metadata are ignored by Git.
+- Store `GEMINI_API_KEY` and the production `RESUME_SIGNING_KEY` in the backend environment. `NEXT_PUBLIC_API_BASE_URL` is a public URL, not a place for credentials.
+- Render/Vercel account tokens are deployment credentials, not application settings. They are not needed to run the app locally and must stay out of source, README examples, screenshots, and logs.
+- Use the supplied synthetic samples for demos and tests. Read the privacy limits below before uploading personal documents.
 
 ## Architecture
 
@@ -167,8 +206,6 @@ Both resumes show matched/missing terms. There is no target score or forced impr
 ```bash
 cd backend
 uv run pytest -q
-# Separate, billable, live-provider check with synthetic data:
-uv run python scripts/smoke_real_provider.py
 
 cd ../frontend
 npm run lint
@@ -176,14 +213,20 @@ npm run typecheck
 npm run build
 npx playwright install chromium
 npm run test:e2e
-
-# Separate, opt-in test of the real deployed frontend/backend and Gemini:
-LIVE_APP_URL=https://tailorcv-orcin.vercel.app npm run test:live
 ```
 
-Playwright launches the real frontend and FastAPI server on ports 3000 and 8001. Only Gemini is replaced by a test dependency override in `tests.mock_server`; the production application has no mock-mode setting. The eight desktop/mobile browser checks cover immediate resume previews, JD entry, extraction, section selection, customization, changes/suggestions, editing, three downloads, keyboard focus, help, connection recovery, reset confirmation, errors, and preserved inputs. They check for browser exceptions and horizontal overflow and capture screenshots. Backend tests validate exported file content after edits. CI repeats backend, frontend, and browser checks on Linux.
+Run this block from the repository root after installing both projects' dependencies. These checks do not need a working Gemini key or consume provider quota. Playwright launches the real frontend and FastAPI server on ports 3000 and 8001. Gemini is replaced by a test dependency override in `tests.mock_server`; a browser regression also injects an incomplete-structuring response to test quota feedback. The production application has no mock-mode setting. The eight desktop/mobile browser checks cover immediate resume previews, JD entry, extraction, section selection, customization, changes/suggestions, editing, three downloads, keyboard focus, help, connection recovery, reset confirmation, errors, and preserved inputs. They check for browser exceptions and horizontal overflow and capture screenshots. Backend tests validate exported file content after edits. CI repeats backend, frontend, and browser checks on Linux.
 
-The browser suite must own its test ports; stop a local frontend on port 3000 before running it. Linux CI uses `npx playwright install --with-deps chromium`. The Windows test config selects `.venv/Scripts/python.exe`; Linux uses `.venv/bin/python`. Override with `E2E_PYTHON` if necessary. The public test uses live Gemini calls and is deliberately excluded from normal CI. On PowerShell run `$env:LIVE_APP_URL='https://tailorcv-orcin.vercel.app'` followed by `npm run test:live`. It uploads only the synthetic sample, verifies protected fields and unselected projects, edits the result, downloads all three formats, and inspects both viewport sizes without duplicating generation for mobile.
+The browser suite must own its test ports; stop a local frontend on port 3000 before running it. Linux CI uses `npx playwright install --with-deps chromium`. The Windows test config selects `.venv/Scripts/python.exe`; Linux uses `.venv/bin/python`. Override with `E2E_PYTHON` if necessary.
+
+**Optional live AI checks:** these consume the configured project's Gemini quota and may incur charges on a paid tier. They are excluded from normal CI. From `backend/`, run `uv run python scripts/smoke_real_provider.py` with a working backend key. To test the deployed application, run the following from `frontend/` in PowerShell:
+
+```powershell
+$env:LIVE_APP_URL = 'https://tailorcv-orcin.vercel.app'
+npm run test:live
+```
+
+For Bash use `LIVE_APP_URL=https://tailorcv-orcin.vercel.app npm run test:live`. The public workflow uploads only the synthetic sample, verifies protected fields and unselected projects, edits the result, downloads all three formats, and inspects both viewport sizes without duplicating generation for mobile. The deployed backend supplies its own Gemini key; no key belongs in `LIVE_APP_URL` or the browser.
 
 See [VERIFICATION.md](VERIFICATION.md) for checks actually run and remaining limitations.
 
@@ -200,9 +243,26 @@ Hosting documentation was checked against official sources during implementation
 5. Deploy the frontend. Update Render `ALLOWED_ORIGINS` with the actual production origin, restart/redeploy the API, then rebuild Vercel if the API URL changed. Add exact preview URLs only when needed; there is intentionally no wildcard `*.vercel.app` CORS rule.
 6. Verify public `/health` and `/docs`, then run the synthetic sample workflow using real Gemini. Test PDF, DOCX, and TXT downloads and a manual edit. Check errors and both viewport sizes. Record actual URLs/results in `VERIFICATION.md` before submission.
 
+**Redeploying this project:** Render is configured to deploy after repository checks pass. The current Vercel publication used CLI upload; automatic Git deployments are not connected yet. To enable them, connect the repository in the Vercel dashboard and retain the `frontend` Root Directory. Alternatively, from the repository root run `npx vercel@64.2.0 deploy --prod` and sign in/link the intended project when prompted. Confirm its Root Directory before deployment. Public frontend environment changes require a new build; backend-only changes require a Render deployment.
+
 The Blueprint requests Render's Free demo instance to avoid silently selecting paid compute. [Render documents](https://render.com/docs/free) that Free web services spin down after 15 idle minutes, can take about a minute to restart, have monthly usage limits, and are not intended for production. Select suitable paid compute for a production launch after reviewing current pricing. Free-service cold starts can exceed the UI health probe timeout; **Retry connection** is available.
 
 [Vercel Hobby](https://vercel.com/docs/plans/hobby) is subject to usage limits and personal/noncommercial eligibility; confirm the account/project qualifies, or choose an appropriate plan. The app's Python backend runs on Render, not in a Vercel Python function. [Vercel root-directory settings](https://vercel.com/docs/builds/configure-a-build#root-directory) must point at `frontend` for this monorepo. [Render FastAPI guidance](https://render.com/docs/deploy-fastapi) confirms binding to `0.0.0.0` and the host-provided port.
+
+## Troubleshooting and other notes
+
+| Symptom | What to check |
+| --- | --- |
+| Connection interrupted / server unreachable | Open the backend `/health` URL. Allow a sleeping Render service to wake, then use **Retry connection**. Locally, keep the API running on port 8000. Check `NEXT_PUBLIC_API_BASE_URL` and exact `ALLOWED_ORIGINS`; rebuild the frontend after changing its public API URL. |
+| Text extracted, but AI structuring did not complete | Open the extracted-text preview and read the provider warning. Confirm the backend key/model and available quota before retrying. The file and JD remain in the current workspace. |
+| Provider quota exhausted | Check the project's active limits in Google AI Studio. Wait for the relevant limit to reset before retrying. A successful `/health` response confirms service availability, not remaining Gemini quota. |
+| Customize Resume does not generate a result | Click it to see the focused validation message. Both a successfully structured resume and a valid JD are required, along with at least one selected section. A file being present does not mean AI preparation succeeded. |
+| Scanned, corrupt, or unsupported upload | Use a readable text-based PDF or DOCX within the configured limits. OCR is not included. |
+| Source verification fails after a backend change | Upload again if the signing key changed. Keep the same production signing key across restarts and instances. |
+
+At the latest recorded live verification on **October 15, 2026**, Gemini reported exhausted daily quota. This is an external limit; redeploying the app does not replenish it. [Google documents](https://ai.google.dev/gemini-api/docs/rate-limits) that limits apply per project, vary by model/tier, and daily request quotas reset at midnight Pacific time. A new key in the same project shares the quota. A successful fresh upload and customization normally uses at least three model operations: resume structuring, JD analysis, and tailoring; retries or schema repair can use more.
+
+Free hosting and free AI allowances are separate. The app has no subscription/payment integration or unlimited-generation guarantee. Inputs are held in the current browser workspace; reloading or leaving the page clears them, so download the edited result before closing it. Scores are keyword heuristics, and factual checks cannot replace reviewing the final resume. Current test results and remaining deployment limitations are kept in [VERIFICATION.md](VERIFICATION.md).
 
 ## Provider and font references
 
