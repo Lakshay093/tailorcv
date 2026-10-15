@@ -187,6 +187,8 @@ The browser suite must own its test ports; stop a local frontend on port 3000 be
 
 See [VERIFICATION.md](VERIFICATION.md) for checks actually run and remaining limitations.
 
+To check the published Customize button without spending AI quota, set `LIVE_APP_URL` and run `npm run test:live -- button-validation.spec.ts`. This validates visible, focused feedback on desktop and mobile, and asserts that no parsing or customization API requests were made.
+
 ## Deployment: Render backend, Vercel frontend
 
 Hosting documentation was checked against official sources during implementation. No assumption is made that all accounts have free eligibility or unlimited resources.
